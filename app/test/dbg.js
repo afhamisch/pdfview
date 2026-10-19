@@ -1,0 +1,12 @@
+import { chromium } from 'playwright';
+const browser = await chromium.launch(); const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
+page.on('console', m => console.log(m.type() + ': ' + m.text().slice(0, 300))); page.on('pageerror', e => console.log('PAGEERROR ' + e.message));
+await page.goto(process.argv[2]); await page.waitForSelector('body[data-ready]', { state: 'attached' });
+await page.click('#restSample'); await page.waitForFunction(() => document.querySelectorAll('.annotationLayer input').length > 3);
+await page.click('[data-tool="redact"]'); console.log('tool', await page.evaluate(() => document.body.dataset.tool));
+const s2 = (await page.$$('.sheet'))[1]; await s2.scrollIntoViewIfNeeded(); const b2 = await s2.boundingBox(); console.log('sheet2', b2);
+const hit = await page.evaluate(([x, y]) => { const e = document.elementFromPoint(x, y); return e ? e.className + '|' + e.tagName + '|' + (e.closest('.sheet') ? 'in-sheet' : 'no') : null; }, [b2.x + 60, b2.y + 60]); console.log('elementFromPoint', hit);
+await page.mouse.move(b2.x + 60, b2.y + 60); await page.mouse.down(); await page.mouse.move(b2.x + 500, b2.y + 200, { steps: 5 }); await page.mouse.up();
+await page.waitForTimeout(300); console.log('objects', await page.$$eval('.obj', e => e.map(x => x.className)));
+console.log('tool after', await page.evaluate(() => document.body.dataset.tool));
+await browser.close();

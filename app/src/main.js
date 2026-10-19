@@ -9,6 +9,7 @@ import { initViewer, layout, zoomTo, goTo, currentPage, updateNav, setHooks } fr
 import { initSearch, openFind, applyHighlights } from './search.js';
 import { initSidebar, toggleSide } from './sidebar.js';
 import { makeSample } from './sample.js';
+import { ctxHooks, keyHooks } from './hooks.js';
 
 document.getElementById('app').innerHTML = SHELL;
 document.body.dataset.tool = 'select';
@@ -47,7 +48,6 @@ const HINT = {
   redact: 'Drag a black box over anything you want to redact. When you save, everything under the boxes is permanently removed from the file.',
   field: 'Click on the page to place the field for the selected signer.'
 };
-export const ctxHooks = { render: null };
 on('ctx', () => {
   const c = $('#ctx'); c.innerHTML = '';
   if (!S.doc) { c.textContent = 'No PDF open. Tools turn on once you open one.'; return; }
@@ -68,7 +68,6 @@ addEventListener('drop', e => { e.preventDefault(); dragN = 0; $('#dropHint').hi
 on('drop', f => { if (!S.org) readFile(f); });
 addEventListener('beforeunload', e => { if (S.dirty && !S.sample) { e.preventDefault(); e.returnValue = ''; } });
 
-export const keyHooks = [];
 addEventListener('keydown', e => {
   const typing = e.target.closest && e.target.closest('input,textarea,select,[contenteditable="true"],[contenteditable="plaintext-only"]');
   const mod = e.ctrlKey || e.metaKey;

@@ -124,8 +124,8 @@ async function renderAnnotations(p) {
     const layer = new lib.AnnotationLayer({ div: p.al, page: p.proxy, viewport: p.vp.clone({ dontFlip: true }), annotationStorage: src.doc.annotationStorage, linkService });
     await layer.render({ annotations, renderForms: true, imageResourcesPath: '' });
     p.annLayer = layer;
-    p.al.addEventListener('input', () => emit('form:change'), { capture: true });
-    p.al.addEventListener('change', () => emit('form:change'), { capture: true });
+    p.al.addEventListener('input', () => emit('form:change', p.src), { capture: true });
+    p.al.addEventListener('change', () => emit('form:change', p.src), { capture: true });
   } catch (e) { console.warn('annotations', e); }
   finally { p.annBusy = false; }
 }
