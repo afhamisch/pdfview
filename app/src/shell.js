@@ -36,7 +36,8 @@ export const SHELL = `
     </div>
     <div class="grp">
       <button class="tb" id="printBtn" disabled title="Print (Ctrl+P)">${ICON.print}<span class="t">Print</span></button>
-      <button class="tb" id="sendBtn" disabled title="Send for signature">${ICON.send}<span class="t">Send</span></button>
+      <button class="tb" id="sendBtn" disabled title="Send this PDF for signature">${ICON.send}<span class="t">Send</span></button>
+      <button class="tb" id="envBtn" title="Envelopes you have sent">${ICON.link}<span class="t">Envelopes</span></button>
     </div>
     <label class="chk" title="Bakes form entries into the page so they can no longer be edited"><input type="checkbox" id="flatten" disabled><span>Flatten</span></label>
     <button class="btn primary" id="saveBtn" type="button" disabled>${ICON.save}Save<span class="dot" id="dirtyDot" hidden></span></button>

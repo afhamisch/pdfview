@@ -11,5 +11,5 @@ export default defineConfig({
     assetsInlineLimit: offline ? 100000000 : 4096,
     chunkSizeWarningLimit: 4000
   },
-  server: { port: 5173, proxy: { '/api': 'http://localhost:8787', '/sign': 'http://localhost:8787' } }
+  server: { port: 5173, proxy: { '/api': 'http://localhost:8787' } }
 });

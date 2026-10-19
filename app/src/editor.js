@@ -176,7 +176,7 @@ export function setTool(t) {
   if (t !== 'select' && (!S.doc || S.org)) return;
   if (t === 'sign' && !S.sig) { openSig().then(sig => { if (sig) { S.sig = sig; setTool('sign'); toast('Click on the page where the signature goes.'); } }); return; }
   S.tool = t; document.body.dataset.tool = t;
-  $$('[data-tool]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.tool === t)));
+  $$('#tools [data-tool]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.tool === t)));
   if (t !== 'select' && S.sel != null) { S.sel = null; renderAllObjs(); }
   emit('ctx');
 }
@@ -222,7 +222,7 @@ export function init() {
   initSignature();
   setHooks({ pageBar, onSheetDown: sheetDown, afterLayoutPage: p => renderObjs(p) });
   ctxHooks.render = renderCtx;
-  $$('[data-tool]').forEach(b => b.addEventListener('click', () => {
+  $$('#tools [data-tool]').forEach(b => b.addEventListener('click', () => {
     const t = b.dataset.tool;
     if ((t === 'highlight' || t === 'whiteout' || t === 'redact') && markSelection(t)) return;
     setTool(t);

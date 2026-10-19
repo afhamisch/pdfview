@@ -85,4 +85,6 @@ for (const m of mods) if (m && m.init) m.init();
 await pdfjs();
 if (location.pathname.startsWith('/sign/') && mods[4]) mods[4].startSigner(location.pathname.slice(6));
 else showRest();
+// Hooks for a desktop wrapper (see desktop/README.md): open a file handed over by the OS.
+window.pdfviewOpen = (bytes, name) => openBytes(bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes), name || 'document.pdf');
 document.body.dataset.ready = '1';

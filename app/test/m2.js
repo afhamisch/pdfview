@@ -48,5 +48,5 @@ out.pgAfterOrg = await page.$$eval('.pg .src-note, .pg-lbl', e => e.length);
 const saved2 = await dl(() => page.click('#saveBtn')); const d2 = await PDFDocument.load(saved2.bytes); out.saved2Pages = d2.getPageCount();
 const t2 = await textOf(saved2.bytes); out.firstPageNowTerms = /Terms of engagement/.test(t2[0]) || t2[0].length < 40;
 // print opens a new tab
-const pop = await Promise.race([ctx.waitForEvent('page').then(p => 'tab:' + p.url().slice(0, 5)), page.waitForEvent('download').then(d => 'download:' + d.suggestedFilename()), (async () => { await page.click('#printBtn'); await new Promise(r => setTimeout(r, 15000)); return 'none'; })()]); out.print = pop;
+const pop = await Promise.race([ctx.waitForEvent('page').then(p => 'tab:' + p.url().slice(0, 5)).catch(() => 'tab-timeout'), page.waitForEvent('download').then(d => 'download:' + d.suggestedFilename()).catch(() => 'dl-timeout'), (async () => { await page.click('#printBtn'); await new Promise(r => setTimeout(r, 15000)); return 'none'; })()]); out.print = pop;
 out.logs = logs.slice(0, 10); console.log(JSON.stringify(out, null, 1)); await browser.close();

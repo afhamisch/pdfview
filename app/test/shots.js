@@ -1,0 +1,22 @@
+// Screenshots of the main screens for a visual check.
+import { chromium } from 'playwright';
+const base = process.argv[2], outDir = process.argv[3];
+const browser = await chromium.launch(); const ctx = await browser.newContext({ viewport: { width: 1400, height: 900 } }); const page = await ctx.newPage();
+await page.addInitScript(() => { try { localStorage.setItem('pdfview.adminToken', 'test-admin'); localStorage.setItem('pdfview.sender', JSON.stringify({ name: 'Alan F. Hamisch', email: 'alan@example.com' })); } catch {} });
+page.on('dialog', d => d.accept());
+await page.goto(base + '/'); await page.waitForSelector('body[data-ready]', { state: 'attached' }); await page.screenshot({ path: outDir + '/1-rest.png' });
+await page.click('#restSample'); await page.waitForFunction(() => document.querySelectorAll('.annotationLayer input').length > 3); await page.waitForTimeout(600);
+await page.click('#sideBtn'); await page.waitForTimeout(800);
+await page.click('[data-tool="text"]'); const b = await (await page.$('.sheet')).boundingBox(); await page.mouse.click(b.x + 300, b.y + 560); await page.waitForSelector('.obj-text .txt[contenteditable]'); await page.keyboard.type('Added text'); await page.keyboard.press('Escape');
+await page.evaluate(() => { const spans = [...document.querySelectorAll('.pg:nth-child(1) .textLayer span')].filter(s => s.textContent.length > 20); const r = document.createRange(); r.selectNodeContents(spans[0]); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); }); await page.keyboard.press('h');
+await page.keyboard.press('Control+f'); await page.fill('#findIn', 'client'); await page.waitForTimeout(600);
+await page.screenshot({ path: outDir + '/2-desk.png' });
+await page.keyboard.press('Escape'); await page.click('#batesBtn'); await page.waitForTimeout(200); await page.screenshot({ path: outDir + '/3-bates.png' }); await page.click('#batesCancel');
+await page.click('#orgBtn'); await page.waitForTimeout(800); await page.screenshot({ path: outDir + '/4-organize.png' }); await page.keyboard.press('Escape'); await page.waitForTimeout(400);
+await page.click('#sendBtn'); await page.waitForSelector('#envModal'); await page.fill('#signerRows .signer-row:nth-child(1) input:not([type=email])', 'Jane Client'); await page.fill('#signerRows .signer-row:nth-child(1) input[type=email]', 'jane@example.com'); await page.screenshot({ path: outDir + '/5-signers.png' }); await page.click('#envSignersOk');
+await page.mouse.click(b.x + 250, b.y + 300); await page.selectOption('#ctx select[aria-label="Field type"]', 'date'); await page.mouse.click(b.x + 850, b.y + 380); await page.waitForTimeout(200); await page.screenshot({ path: outDir + '/6-compose.png' });
+await page.click('#envSend'); await page.waitForSelector('#linksModal', { timeout: 60000 }); const link = await page.inputValue('#linksModal .signlink'); await page.screenshot({ path: outDir + '/7-sent.png' }); await page.click('#linksDone');
+const s = await ctx.newPage(); await s.goto(link); await s.waitForSelector('.obj-sigfield', { timeout: 60000 }); await s.waitForTimeout(500); await s.screenshot({ path: outDir + '/8-signer.png' });
+await s.click('.obj-sigfield[data-ftype="signature"]'); await s.waitForSelector('#sigModal:not([hidden])'); await s.screenshot({ path: outDir + '/9-sigmodal.png' });
+await page.click('#envBtn'); await page.waitForSelector('#envList'); await page.click('#envList .mini'); await page.waitForSelector('#envDetail'); await page.screenshot({ path: outDir + '/10-envelope.png' });
+await browser.close(); console.log('shots done');

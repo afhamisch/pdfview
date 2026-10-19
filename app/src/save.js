@@ -74,7 +74,7 @@ async function sourceBytes(src) {
 }
 
 /* Build the output PDF. Returns { bytes, redacted }. */
-export async function buildPdf() {
+export async function buildPdf({ editLayer = true } = {}) {
   const doc = await PDFDocument.load(await sourceBytes(S.sources.get(0)), { ignoreEncryption: true, updateMetadata: false });
   const helv = await doc.embedFont(StandardFonts.Helvetica);
   const flatten = $('#flatten').checked;
@@ -131,7 +131,7 @@ export async function buildPdf() {
   if (!(order.length === N0 && order.every((pg, i) => pg === mainPages[i]))) { order.forEach(pg => doc.addPage(pg)); for (let i = N0 - 1; i >= 0; i--) doc.removePage(i); }
   if (redIdx.length) await applyRedactions(doc, redIdx, redRects);
   collectGarbage(doc);
-  if (layer.length) doc.catalog.set(PN(EDIT_KEY), PDFHexString.fromText(JSON.stringify({ v: 2, pages: layer, objects: kept, bates: S.bates })));
+  if (editLayer && layer.length) doc.catalog.set(PN(EDIT_KEY), PDFHexString.fromText(JSON.stringify({ v: 2, pages: layer, objects: kept, bates: S.bates })));
   // object streams are off so the editable-layer marker stays visible to the quick check on reopen
   return { bytes: await doc.save({ updateFieldAppearances: false, useObjectStreams: false }), redacted: redIdx.length };
 }
@@ -145,8 +145,9 @@ export async function save(confirmed) {
   const btn = $('#saveBtn'); busy = true; btn.disabled = true;
   try {
     const { bytes, redacted } = await buildPdf(); const filename = outputName(redacted);
-    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' })); a.download = filename; document.body.append(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(a.href), 4000); S.dirty = false; $('#dirtyDot').hidden = true;
+    if (typeof window.pdfviewSaveHook === 'function') { const ok = await window.pdfviewSaveHook({ filename, bytes }); if (ok === false) { toast('Save cancelled.'); return; } }
+    else { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' })); a.download = filename; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); }
+    S.dirty = false; $('#dirtyDot').hidden = true;
     toast(redacted ? `Saved ${filename} with ${plural(rst.n, 'redaction')} applied.` : 'Saved ' + filename);
   } catch (e) { console.error(e); toast('This PDF could not be saved. It may be encrypted or damaged.'); }
   finally { busy = false; btn.disabled = false; }

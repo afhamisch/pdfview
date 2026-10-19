@@ -52,7 +52,7 @@ export async function loadDoc(bytes) {
   try { return { doc: await task.promise }; } catch (e) { return { error: e, needsPw: needsPw || e?.name === 'PasswordException' }; }
 }
 
-export async function openBytes(bytes, name, { sample = false } = {}) {
+export async function openBytes(bytes, name, { sample = false, quiet = false } = {}) {
   const prep = await prepare(bytes); bytes = prep.bytes;
   const r = await loadDoc(bytes);
   if (!r.doc) { console.error(r.error); toast(r.needsPw ? 'This PDF is password protected. Remove the password, then open it here.' : 'That file could not be opened as a PDF.'); return false; }
@@ -65,6 +65,7 @@ export async function openBytes(bytes, name, { sample = false } = {}) {
   try { S.meta.outline = await doc.getOutline(); } catch { S.meta.outline = null; }
   emit('doc:open');
   const k = S.objects.length;
+  if (quiet) return true;
   if (prep.stale) toast('This PDF was changed in another program after it was saved here, so items added earlier are now part of the page and cannot be edited.');
   else if (k) toast(`Opened ${plural(doc.numPages, 'page')} with ${plural(k, 'added item')} you can still move, edit or delete.`);
   else if (!sample) toast(`Opened ${plural(doc.numPages, 'page')}.`);
