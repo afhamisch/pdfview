@@ -28,7 +28,7 @@ export const SHELL = `
     </div>
     <div class="spacer"></div>
     <div class="grp" role="toolbar" aria-label="Tools" id="tools">
-      ${tool('select', 'Select', 'V')}${tool('text', 'Text', 'T')}${tool('stamp', 'Stamp', 'M')}${tool('check', 'Check', 'K')}${tool('sign', 'Sign', 'S')}${tool('highlight', 'Highlight', 'H')}${tool('whiteout', 'White-out', 'W')}${tool('redact', 'Redact', 'R')}
+      ${tool('select', 'Select', 'V')}${tool('text', 'Text', 'T')}${tool('stamp', 'Stamp', 'M')}${tool('check', 'Check', 'K')}${tool('sign', 'Sign', 'S')}${tool('highlight', 'Highlight', 'H')}${tool('draw', 'Marker', 'D')}${tool('shape', 'Shapes', 'A')}${tool('erase', 'Eraser', 'E')}${tool('whiteout', 'White-out', 'W')}${tool('redact', 'Redact', 'R')}${tool('snap', 'Snapshot', 'N')}
     </div>
     <div class="grp">
       <button class="tb" id="undoBtn" title="Undo (Ctrl+Z)" disabled>${ICON.undo}<span class="t">Undo</span></button>

@@ -55,11 +55,11 @@ export function renderOcrLayer(p) {
   for (const wd of p.ocr.words) {
     const hpx = wd.h * S.scale;
     const span = el('span', { class: 'ocr', text: wd.text + ' ', style: { fontSize: hpx * 0.85 + 'px', lineHeight: hpx + 'px' } });
-    place(span, p, { x: wd.tl[0], y: wd.tl[1], w: wd.w, h: wd.h, a: p.ocr.rot });
+    place(span, p, { x: wd.tl[0], y: wd.tl[1], h: wd.h, a: p.ocr.rot }); // no width: measured below
     frag.append(span); p.ocrDivs.push(span);
   }
   p.ocrl.append(frag);
-  // stretch each span so the transparent text covers the printed word exactly (as pdf.js does)
+  // stretch each span so the transparent text (and the selection drawn on it) covers the printed word exactly, as pdf.js does
   for (let i = 0; i < p.ocrDivs.length; i++) { const span = p.ocrDivs[i], want = p.ocr.words[i].w * S.scale, have = span.offsetWidth; if (have > 0 && Math.abs(have - want) > 0.5) span.style.transform = (span.style.transform ? span.style.transform + ' ' : '') + `scaleX(${want / have})`; }
   if (findState.hits.length) applyHighlights(p);
 }

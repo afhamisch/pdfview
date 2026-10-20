@@ -6,7 +6,7 @@ export const S = {
   pages: [], reg: new Map(),
   scale: 1, fit: 'width', // 'width' | 'page' | null
   tool: 'select', objects: [], sel: null, editing: null, undo: [], dirty: false,
-  sig: null, tsize: 11, tcolor: '#111111', stamp: '', textStyle: { font: 'helv', bold: false, italic: false, underline: false, align: 'left', list: 'none' },
+  sig: null, tsize: 11, tcolor: '#111111', stamp: '', ink: { mode: 'marker', width: 8, markerColor: '#ffd400', penColor: '#111111', eraseWidth: 10 }, shape: { kind: 'arrow', width: 2, color: '#b3261e' }, snap: null, textStyle: { font: 'helv', bold: false, italic: false, underline: false, align: 'left', list: 'none' },
   org: false, osel: new Set(), anchor: null, orgReturn: null,
   bates: null,           // { prefix, start, pad, corner, size } or null
   meta: {}               // misc: outline, title

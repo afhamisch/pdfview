@@ -3,6 +3,7 @@ app/dist/
 app/dist-offline/
 app/dist-desktop/
 app/public/ocr/
+app/public/fonts/
 server/data/
 .env
 app/public/pdfjs/

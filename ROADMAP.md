@@ -20,9 +20,11 @@ Viewer
 - print by opening the saved PDF in the browser's own print path
 
 Editor
-- fill form fields, add text (fonts, size, bold, italic, underline, left,
-  center, right and justified, bullets and numbering, color, wrapping
-  boxes), stamps with presets (exhibit labels, FILED,
+- fill form fields, add text (standard and bundled or user-supplied fonts,
+  size, bold, italic, underline, left, center, right and justified, bullets
+  and numbering, color, wrapping boxes), stamps with presets, freehand
+  marker and pen, shapes (line, arrow, rectangle, ellipse), eraser,
+  snapshot of a page region as image or text (exhibit labels, FILED,
   CONFIDENTIAL, dated RECEIVED, custom), check marks, signatures (draw or
   type), highlight, white-out
 - redaction: the page is rasterized with the boxes burned in, fields,

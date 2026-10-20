@@ -45,8 +45,14 @@ function objEl(p, o) {
   } else if (o.type === 'image') d.append(el('img', { src: o.src, alt: 'Signature', draggable: 'false' }));
   else if (o.type === 'check') d.innerHTML = `<svg viewBox="0 0 100 100" preserveAspectRatio="none"><polyline points="12,55 40,82 90,18" fill="none" stroke="${o.color}" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
   else if (o.type === 'field') d.append(el('span', { class: 'fl', text: fieldLabel(o) }));
+  else if (o.type === 'shape') d.innerHTML = shapeSvg(o, S.scale);
+  else if (o.type === 'ink') {
+    d.classList.add(o.mode === 'marker' ? 'marker' : o.mode === 'erase' ? 'erase' : 'pen');
+    const pts = o.pts.map(([x, y]) => `${(x - o.x).toFixed(2)},${(o.y - y).toFixed(2)}`).join(' ');
+    d.innerHTML = `<svg viewBox="0 0 ${o.w} ${o.h}" preserveAspectRatio="none"><polyline points="${pts}" fill="none" stroke="${o.color}" stroke-width="${o.width}" stroke-linecap="round" stroke-linejoin="round" opacity="${o.mode === 'marker' ? .42 : 1}" vector-effect="non-scaling-stroke" style="stroke-width:${o.width * S.scale}px"/></svg>`;
+  }
   place(d, p, o);
-  if (S.sel === o.id && !o.box) { const h = el('div', { class: 'hdl', title: o.type === 'text' ? 'Drag to set the box width (text wraps inside it)' : 'Drag to resize' }); h.addEventListener('pointerdown', e => resizeDown(p, o, d, e)); d.append(h); }
+  if (S.sel === o.id && !o.box && o.type !== 'ink') { const h = el('div', { class: 'hdl', title: o.type === 'text' ? 'Drag to set the box width (text wraps inside it)' : 'Drag to resize' }); h.addEventListener('pointerdown', e => resizeDown(p, o, d, e)); d.append(h); }
   d.addEventListener('pointerdown', e => objDown(p, o, e));
   return d;
 }
@@ -122,6 +128,11 @@ function sheetDown(p, e) {
   if (e.button > 0 || S.mode === 'sign') return;
   const P = toWorld(p, e), R = rotOf(p), tool = S.tool;
   if (tool === 'select') { if (S.sel != null) select(null); return; }
+  if ((tool === 'highlight' || tool === 'whiteout' || tool === 'redact') && e.target.matches('.textLayer span, .ocrLayer span')) {
+    // started on a word: let the browser select text, then mark the selection on release
+    const up = () => { removeEventListener('pointerup', up); removeEventListener('pointercancel', up); setTimeout(() => { if (!markSelection(tool)) getSelection()?.removeAllRanges(); }, 0); };
+    addEventListener('pointerup', up); addEventListener('pointercancel', up); return;
+  }
   e.preventDefault();
   if (tool === 'text') {
     pushUndo(); const tl = offset(P, R, -2, -(S.tsize * 0.75 + 2));
@@ -143,6 +154,40 @@ function sheetDown(p, e) {
     if (!fieldHooks.make) return; const f = fieldHooks.make(); if (!f) return;
     pushUndo(); const tl = offset(P, R, -f.w / 2, -f.h / 2);
     addObj(p, Object.assign({ type: 'field', x: tl[0], y: tl[1], a: R }, f));
+  } else if (tool === 'draw' || tool === 'erase') {
+    e.preventDefault(); if (e.target.setPointerCapture) { try { p.sheet.setPointerCapture(e.pointerId); } catch {} }
+    const mode = tool === 'erase' ? 'erase' : S.ink.mode, width = tool === 'erase' ? S.ink.eraseWidth : S.ink.width, color = mode === 'erase' ? '#ffffff' : mode === 'marker' ? S.ink.markerColor : S.ink.penColor;
+    const pts = [P]; const svg = el('div', { class: 'obj obj-ink ghost ' + mode }); p.ol.append(svg);
+    const draw = () => { const xs = pts.map(q => q[0]), ys = pts.map(q => q[1]); const x0 = Math.min(...xs) - width, x1 = Math.max(...xs) + width, y0 = Math.min(...ys) - width, y1 = Math.max(...ys) + width; const o = { x: x0, y: y1, w: x1 - x0, h: y1 - y0, a: 0 }; place(svg, p, o); svg.innerHTML = `<svg viewBox="0 0 ${o.w} ${o.h}" preserveAspectRatio="none"><polyline points="${pts.map(([x, y]) => `${x - x0},${y1 - y}`).join(' ')}" fill="none" stroke="${color}" stroke-width="${width}" stroke-linecap="round" stroke-linejoin="round" opacity="${mode === 'marker' ? .42 : 1}" vector-effect="non-scaling-stroke" style="stroke-width:${width * S.scale}px"/></svg>`; };
+    draw();
+    const mv = ev => { const q = toWorld(p, ev); const l = pts[pts.length - 1]; if (Math.hypot(q[0] - l[0], q[1] - l[1]) < 1.2) return; pts.push(q); draw(); };
+    const up = () => {
+      removeEventListener('pointermove', mv); removeEventListener('pointerup', up); removeEventListener('pointercancel', up); svg.remove();
+      if (pts.length < 2) pts.push([P[0] + 0.5, P[1]]);
+      const xs = pts.map(q => q[0]), ys = pts.map(q => q[1]); const x0 = Math.min(...xs) - width, x1 = Math.max(...xs) + width, y0 = Math.min(...ys) - width, y1 = Math.max(...ys) + width;
+      pushUndo(); const o = addObj(p, { type: 'ink', mode, width, color, pts, x: x0, y: y1, w: x1 - x0, h: y1 - y0, a: 0 }); S.sel = null; renderObjs(p); emit('ctx');
+    };
+    addEventListener('pointermove', mv); addEventListener('pointerup', up); addEventListener('pointercancel', up);
+  } else if (tool === 'shape') {
+    const g = el('div', { class: 'obj obj-shape ghost' }); p.ol.append(g);
+    const kind = S.shape.kind, width = S.shape.width, color = S.shape.color;
+    let r = rectFrom(P, P, R), dir = [0, 0, 1, 1];
+    const upd = ev => { const E = toWorld(p, ev); r = rectFrom(P, E, R); const { c, s } = frame(R); const u = (E[0] - P[0]) * c + (E[1] - P[1]) * s, v = (E[0] - P[0]) * s - (E[1] - P[1]) * c; dir = u < 0 ? [1, v < 0 ? 1 : 0, 0, v < 0 ? 0 : 1] : [0, v < 0 ? 1 : 0, 1, v < 0 ? 0 : 1]; const o = Object.assign({ kind, width, color, dir }, r); place(g, p, o); g.innerHTML = shapeSvg(o, S.scale); };
+    const mv = ev => upd(ev);
+    const up = ev => {
+      removeEventListener('pointermove', mv); removeEventListener('pointerup', up); removeEventListener('pointercancel', up); g.remove();
+      if (r.w < 2 && r.h < 2) return;
+      if (kind === 'rect' || kind === 'ellipse') { r.w = Math.max(r.w, 2); r.h = Math.max(r.h, 2); }
+      pushUndo(); addObj(p, Object.assign({ type: 'shape', kind, width, color, dir }, r));
+    };
+    addEventListener('pointermove', mv); addEventListener('pointerup', up); addEventListener('pointercancel', up);
+  } else if (tool === 'snap') {
+    e.preventDefault(); clearSnap();
+    const g = el('div', { class: 'obj snapbox ghost' }); p.ol.append(g);
+    let r = rectFrom(P, P, R); place(g, p, r);
+    const mv = ev => { r = rectFrom(P, toWorld(p, ev), R); place(g, p, r); };
+    const up = () => { removeEventListener('pointermove', mv); removeEventListener('pointerup', up); removeEventListener('pointercancel', up); if (r.w < 4 || r.h < 4) { g.remove(); return; } S.snap = { p, r, box: g }; takeSnapshot('image'); emit('ctx'); };
+    addEventListener('pointermove', mv); addEventListener('pointerup', up); addEventListener('pointercancel', up);
   } else if (tool === 'highlight' || tool === 'whiteout' || tool === 'redact') {
     const g = el('div', { class: 'obj obj-' + tool + ' ghost' }); p.ol.append(g);
     let r = rectFrom(P, P, R); place(g, p, r);
@@ -154,6 +199,48 @@ function sheetDown(p, e) {
     };
     addEventListener('pointermove', mv); addEventListener('pointerup', up); addEventListener('pointercancel', up);
   }
+}
+/* ---------- shapes ---------- */
+export function shapeSvg(o, scale) {
+  const sw = o.width * scale, st = `stroke="${o.color}" stroke-width="${o.width}" vector-effect="non-scaling-stroke" style="stroke-width:${sw}px" fill="none" stroke-linecap="round" stroke-linejoin="round"`;
+  const [sx, sy, ex, ey] = o.dir || [0, 0, 1, 1]; const x1 = sx * o.w, y1 = sy * o.h, x2 = ex * o.w, y2 = ey * o.h;
+  let body = '';
+  if (o.kind === 'rect') body = `<rect x="0" y="0" width="${o.w}" height="${o.h}" ${st}/>`;
+  else if (o.kind === 'ellipse') body = `<ellipse cx="${o.w / 2}" cy="${o.h / 2}" rx="${o.w / 2}" ry="${o.h / 2}" ${st}/>`;
+  else {
+    body = `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" ${st}/>`;
+    if (o.kind === 'arrow') { const ang = Math.atan2(y2 - y1, x2 - x1), L = Math.max(6, o.width * 4.5), a = Math.PI / 7; const hx = [x2 - L * Math.cos(ang - a), x2 - L * Math.cos(ang + a)], hy = [y2 - L * Math.sin(ang - a), y2 - L * Math.sin(ang + a)]; body += `<polyline points="${hx[0]},${hy[0]} ${x2},${y2} ${hx[1]},${hy[1]}" ${st}/>`; }
+  }
+  return `<svg viewBox="0 0 ${o.w} ${o.h}" preserveAspectRatio="none">${body}</svg>`;
+}
+/* ---------- snapshot: copy part of a page as an image or its text ---------- */
+function clearSnap() { if (S.snap?.box) S.snap.box.remove(); S.snap = null; }
+function snapCanvas() {
+  const { p, r } = S.snap; const dpr = p.canvas.width / p.vp.width;
+  const corners = [[0, 0], [r.w, 0], [r.w, r.h], [0, r.h]].map(([u, v]) => p.vp.convertToViewportPoint(...offset([r.x, r.y], r.a, u, v)));
+  const xs = corners.map(c => c[0]), ys = corners.map(c => c[1]); const x = Math.max(0, Math.min(...xs)), y = Math.max(0, Math.min(...ys)), w = Math.min(p.vp.width, Math.max(...xs)) - x, h = Math.min(p.vp.height, Math.max(...ys)) - y;
+  const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(w * dpr)); c.height = Math.max(1, Math.round(h * dpr));
+  const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(p.canvas, x * dpr, y * dpr, w * dpr, h * dpr, 0, 0, c.width, c.height);
+  return c;
+}
+async function snapText() {
+  const { p, r } = S.snap; const { pageText } = await import('./search.js'); const t = await pageText(p);
+  const inside = (x, y) => { const { c, s } = frame(r.a); const dx = x - r.x, dy = y - r.y; const u = dx * c + dy * s, v = dx * s - dy * c; return u >= -1 && u <= r.w + 1 && v >= -1 && v <= r.h + 1; };
+  let out = ''; for (const it of t.items) { if (!it.transform) continue; const x = it.transform[4], y = it.transform[5] + (it.height || 8) / 2; if (!inside(x, y)) continue; out += it.str; if (it.hasEOL) out += '\n'; }
+  return out.replace(/[ \t]+\n/g, '\n').trim();
+}
+export async function takeSnapshot(kind) {
+  if (!S.snap) return;
+  try {
+    if (kind === 'image' || kind === 'png') {
+      const c = snapCanvas(); const blob = await new Promise(res => c.toBlob(res, 'image/png'));
+      if (kind === 'png' || !navigator.clipboard?.write || !window.ClipboardItem) { const a = el('a', { href: URL.createObjectURL(blob), download: (S.name.replace(/\.pdf$/i, '') || 'page') + '-snapshot.png' }); document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); toast(kind === 'png' ? 'Snapshot saved as a PNG file.' : 'Clipboard images are not available here; the snapshot was saved as a PNG file instead.'); }
+      else { await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]); toast('Snapshot copied as an image. Paste it into Word, email or anywhere else.'); }
+    } else if (kind === 'text') {
+      const t = await snapText(); if (!t) { toast('No text in that area. If it is a scan, run OCR first.'); return; }
+      await navigator.clipboard.writeText(t); toast(`Copied ${t.split(/\s+/).length} words of text.`);
+    }
+  } catch (e) { console.error(e); toast('The snapshot could not be copied: ' + (e.message || e)); }
 }
 // Highlight (or white-out / redact) whatever text is currently selected in the text layer.
 export function markSelection(type) {
@@ -187,6 +274,7 @@ export function markSelection(type) {
 export function setTool(t) {
   if (t !== 'select' && (!S.doc || S.org)) return;
   if (t === 'sign' && !S.sig) { openSig().then(sig => { if (sig) { S.sig = sig; setTool('sign'); toast('Click on the page where the signature goes.'); } }); return; }
+  if (S.tool === 'snap' && t !== 'snap') clearSnap();
   S.tool = t; document.body.dataset.tool = t;
   $$('#tools [data-tool]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.tool === t)));
   if (t !== 'select' && S.sel != null) { S.sel = null; renderAllObjs(); }
@@ -209,6 +297,33 @@ function renderCtx(c) {
       c.append(sel, custom, el('span', { text: 'then click on the page to place it.' })); return true;
     }
     if (S.tool === 'highlight' || S.tool === 'whiteout' || S.tool === 'redact') { c.append(el('span', { text: `Drag a box on the page, or select text and press ${S.tool === 'highlight' ? 'H' : S.tool === 'whiteout' ? 'W' : 'R'} again to mark the selection.` })); return true; }
+    if (S.tool === 'draw') {
+      c.append(el('span', { class: 'lbl', text: 'Marker' }));
+      const mode = el('select', { class: 'ctl', 'aria-label': 'Marker type' }); [['marker', 'Highlighter (see-through)'], ['pen', 'Pen (solid)']].forEach(([v, t]) => mode.append(el('option', { value: v, text: t }))); mode.value = S.ink.mode; mode.addEventListener('change', () => { S.ink.mode = mode.value; emit('ctx'); });
+      const width = el('select', { class: 'ctl', 'aria-label': 'Thickness' }); [[2, 'Thin'], [4, 'Medium'], [8, 'Thick'], [14, 'Wide']].forEach(([v, t]) => width.append(el('option', { value: v, text: t }))); width.value = S.ink.width; width.addEventListener('change', () => { S.ink.width = +width.value; });
+      const colors = S.ink.mode === 'marker' ? [['#ffd400', 'Yellow'], ['#7cf27c', 'Green'], ['#7cc4ff', 'Blue'], ['#ff9ad5', 'Pink']] : [['#111111', 'Black'], ['#1a3a8f', 'Blue'], ['#b3261e', 'Red']];
+      const cur = S.ink.mode === 'marker' ? S.ink.markerColor : S.ink.penColor;
+      c.append(mode, width); colors.forEach(([hex, name]) => { const b = el('button', { class: 'sw', type: 'button', title: name, 'aria-label': name, 'aria-pressed': String(cur === hex), style: { background: hex } }); b.addEventListener('click', () => { if (S.ink.mode === 'marker') S.ink.markerColor = hex; else S.ink.penColor = hex; emit('ctx'); }); c.append(b); });
+      c.append(el('span', { text: 'Draw on the page. Each stroke can be moved or deleted afterwards.' })); return true;
+    }
+    if (S.tool === 'shape') {
+      c.append(el('span', { class: 'lbl', text: 'Shapes' }));
+      const kind = el('select', { class: 'ctl', id: 'shapeKind', 'aria-label': 'Shape' }); [['line', 'Line'], ['arrow', 'Arrow'], ['rect', 'Rectangle'], ['ellipse', 'Circle or ellipse']].forEach(([v, t]) => kind.append(el('option', { value: v, text: t }))); kind.value = S.shape.kind; kind.addEventListener('change', () => { S.shape.kind = kind.value; });
+      const width = el('select', { class: 'ctl', 'aria-label': 'Line thickness' }); [[1, 'Hairline'], [2, 'Thin'], [3, 'Medium'], [5, 'Thick']].forEach(([v, t]) => width.append(el('option', { value: v, text: t }))); width.value = S.shape.width; width.addEventListener('change', () => { S.shape.width = +width.value; });
+      c.append(kind, width); COLORS.forEach(([hex, name]) => { const b = el('button', { class: 'sw', type: 'button', title: name, 'aria-label': name, 'aria-pressed': String(S.shape.color === hex), style: { background: hex } }); b.addEventListener('click', () => { S.shape.color = hex; emit('ctx'); }); c.append(b); });
+      const pick = el('input', { type: 'color', class: 'colorpick', value: S.shape.color, title: 'Any color' }); pick.addEventListener('change', () => { S.shape.color = pick.value; emit('ctx'); }); c.append(pick, el('span', { text: 'Drag on the page to draw it. Shapes can be moved and resized afterwards.' })); return true;
+    }
+    if (S.tool === 'erase') {
+      c.append(el('span', { class: 'lbl', text: 'Eraser' }));
+      const width = el('select', { class: 'ctl', 'aria-label': 'Eraser size' }); [[4, 'Small'], [10, 'Medium'], [20, 'Large'], [40, 'Very large']].forEach(([v, t]) => width.append(el('option', { value: v, text: t }))); width.value = S.ink.eraseWidth; width.addEventListener('change', () => { S.ink.eraseWidth = +width.value; });
+      c.append(width, el('span', { text: 'Drag over the part you want gone. It is painted white in the saved copy, so it suits white paper; use Redact when the content must be removed for good.' })); return true;
+    }
+    if (S.tool === 'snap') {
+      c.append(el('span', { class: 'lbl', text: 'Snapshot' }));
+      if (S.snap) c.append(el('button', { class: 'mini', type: 'button', id: 'snapImg', text: 'Copy image', onclick: () => takeSnapshot('image') }), el('button', { class: 'mini', type: 'button', id: 'snapTxt', text: 'Copy text', onclick: () => takeSnapshot('text') }), el('button', { class: 'mini', type: 'button', id: 'snapPng', text: 'Save PNG', onclick: () => takeSnapshot('png') }), el('button', { class: 'mini', type: 'button', text: 'Clear', onclick: () => { clearSnap(); emit('ctx'); } }));
+      else c.append(el('span', { text: 'Drag a box around the part of the page you want. It is copied as an image right away; the text in it can be copied too.' }));
+      return true;
+    }
     if (S.tool === 'text') {
       c.append(el('span', { class: 'lbl', text: 'Text' }));
       const target = Object.assign({ size: S.tsize, color: S.tcolor }, S.textStyle);
@@ -217,7 +332,7 @@ function renderCtx(c) {
     }
     return false;
   }
-  c.append(el('span', { class: 'lbl', text: { text: o.box ? 'Stamp' : 'Text', check: 'Check mark', image: 'Signature', highlight: 'Highlight', whiteout: 'White-out', redact: 'Redaction', field: 'Signature field' }[o.type] }));
+  c.append(el('span', { class: 'lbl', text: { text: o.box ? 'Stamp' : 'Text', check: 'Check mark', image: 'Signature', highlight: 'Highlight', whiteout: 'White-out', redact: 'Redaction', field: 'Signature field', ink: o.mode === 'marker' ? 'Marker stroke' : o.mode === 'erase' ? 'Eraser stroke' : 'Pen stroke', shape: { line: 'Line', arrow: 'Arrow', rect: 'Rectangle', ellipse: 'Ellipse' }[o.kind] }[o.type] }));
   if (o.type === 'redact') c.append(el('span', { text: 'Content under this box is permanently removed when you save.', style: { color: 'var(--redline)' } }));
   if (o.type === 'text' && !o.box) {
     textToolbar(c, o, { onChange: mut => { pushUndo(); mut(o); S.tsize = o.size; S.tcolor = o.color; const { font, bold, italic, underline, align, list } = o; S.textStyle = { font, bold, italic, underline, align, list }; const wasEditing = S.editing === o.id; renderObjs(PG(o.page)); markDirty(); emit('ctx'); if (wasEditing) startEdit(o); } });
@@ -226,6 +341,11 @@ function renderCtx(c) {
     const sz = el('select', { class: 'ctl', 'aria-label': 'Text size' });
     [8, 9, 10, 11, 12, 14, 16, 18, 24, 32].forEach(n => sz.append(el('option', { value: n, text: n + ' pt' })));
     sz.value = o.size; sz.addEventListener('change', () => { pushUndo(); o.size = +sz.value; renderObjs(PG(o.page)); markDirty(); }); c.append(sz);
+  }
+  if (o.type === 'shape' || (o.type === 'ink' && o.mode !== 'erase')) {
+    const width = el('select', { class: 'ctl', 'aria-label': 'Thickness' }); [1, 2, 3, 4, 5, 8, 14].forEach(v => width.append(el('option', { value: v, text: v + ' pt' }))); width.value = o.width; width.addEventListener('change', () => { pushUndo(); o.width = +width.value; renderObjs(PG(o.page)); markDirty(); });
+    const pick = el('input', { type: 'color', class: 'colorpick', value: o.color, title: 'Color' }); pick.addEventListener('change', () => { pushUndo(); o.color = pick.value; renderObjs(PG(o.page)); markDirty(); });
+    c.append(width, pick);
   }
   if ((o.type === 'text' && o.box) || o.type === 'check') {
     COLORS.forEach(([hex, name]) => { const b = el('button', { class: 'sw', type: 'button', title: name, 'aria-label': name, 'aria-pressed': String(o.color === hex), style: { background: hex } }); b.addEventListener('pointerdown', e => e.preventDefault()); b.addEventListener('click', () => { pushUndo(); o.color = hex; S.tcolor = hex; renderObjs(PG(o.page)); markDirty(); emit('ctx'); }); c.append(b); });
@@ -269,7 +389,7 @@ export function init() {
     if ((e.key === 'Delete' || e.key === 'Backspace') && S.sel != null) { e.preventDefault(); removeSel(); return true; }
     if (e.key === 'Escape') { if (S.sel != null) select(null); else setTool('select'); return true; }
     if (mod || e.altKey) return false;
-    const k = { v: 'select', t: 'text', m: 'stamp', k: 'check', s: 'sign', h: 'highlight', w: 'whiteout', r: 'redact' }[e.key.toLowerCase()];
+    const k = { v: 'select', t: 'text', m: 'stamp', k: 'check', s: 'sign', h: 'highlight', d: 'draw', a: 'shape', e: 'erase', w: 'whiteout', r: 'redact', n: 'snap' }[e.key.toLowerCase()];
     if (k && S.doc) { if ((k === 'highlight' || k === 'whiteout' || k === 'redact') && markSelection(k)) return true; setTool(k); return true; }
     return false;
   });
