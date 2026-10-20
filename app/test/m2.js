@@ -30,6 +30,17 @@ await page.click('[data-tool="check"]'); await page.mouse.click(b.x + 100, b.y +
 await page.click('[data-tool="select"]');
 await page.evaluate(() => { const spans = [...document.querySelectorAll('.pg:nth-child(1) .textLayer span')].filter(s => s.textContent.length > 20); const r = document.createRange(); r.selectNodeContents(spans[0]); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); });
 await page.keyboard.press('h');
+// marker stroke, arrow, eraser stroke, then a snapshot of the title area
+await page.click('[data-tool="draw"]'); await page.mouse.move(b.x + 300, b.y + 420); await page.mouse.down(); for (let i = 1; i <= 6; i++) await page.mouse.move(b.x + 300 + i * 40, b.y + 420 + (i % 2) * 6); await page.mouse.up();
+await page.click('[data-tool="shape"]'); await page.selectOption('#shapeKind', 'arrow'); await page.mouse.move(b.x + 900, b.y + 300); await page.mouse.down(); await page.mouse.move(b.x + 1000, b.y + 380, { steps: 4 }); await page.mouse.up();
+await page.click('[data-tool="erase"]'); await page.mouse.move(b.x + 350, b.y + 250); await page.mouse.down(); await page.mouse.move(b.x + 420, b.y + 250, { steps: 4 }); await page.mouse.up();
+await ctx.grantPermissions(['clipboard-read', 'clipboard-write']);
+await page.click('[data-tool="snap"]'); await page.mouse.move(b.x + 80, b.y + 60); await page.mouse.down(); await page.mouse.move(b.x + 600, b.y + 140, { steps: 4 }); await page.mouse.up(); await page.waitForTimeout(600);
+out.snapshot = { toast: await page.textContent('#toast'), clip: await page.evaluate(async () => { try { const items = await navigator.clipboard.read(); return items.map(i => i.types.join('+')); } catch (e) { return 'err ' + e.message; } }) };
+await page.click('#snapTxt'); await page.waitForTimeout(300); out.snapshot.text = await page.evaluate(() => navigator.clipboard.readText().catch(e => 'err'));
+// custom font on a new text item
+await page.click('[data-tool="text"]'); await page.selectOption('#ctx select[aria-label="Font"]', 'tinos'); await page.mouse.click(b.x + 700, b.y + 640); await page.waitForSelector('.obj-text .txt[contenteditable]'); await page.keyboard.type('Tinos text'); await page.keyboard.press('Escape'); await page.waitForTimeout(200);
+out.customFont = await page.$$eval('.obj-text .txt', e => e.map(x => getComputedStyle(x).fontFamily.slice(0, 16)).pop());
 // redact box on page 2 by dragging
 await page.click('[data-tool="redact"]'); const s2 = (await page.$$('.sheet'))[1]; await s2.evaluate(e => e.scrollIntoView({ block: 'start' })); await page.waitForTimeout(200); const b2 = await s2.boundingBox();
 await page.mouse.move(b2.x + 60, b2.y + 60); await page.mouse.down(); await page.mouse.move(b2.x + 500, b2.y + 200, { steps: 5 }); await page.mouse.up();
@@ -45,7 +56,7 @@ const saved = await dl(() => page.click('#redGo'));
 out.saved = { name: saved.name, size: saved.bytes.length };
 const doc = await PDFDocument.load(saved.bytes); out.savedPages = doc.getPageCount(); out.rot = doc.getPage(0).getRotation().angle;
 out.fieldValue = doc.getForm().getTextField('full_name').getText(); out.hasEditLayer = saved.bytes.includes('/EditLayer');
-const texts = await textOf(saved.bytes); out.p1HasAdded = /Added by PDFView/.test(texts[0]); out.p1HasStamp = /CONFIDENTIAL/.test(texts[0]); out.p1Bullets = /\u2022/.test(texts[0]); out.timesBold = saved.bytes.includes('Times-Bold'); out.p1Bates = /HAM-00100/.test(texts[0]); out.p2TextAfterRedact = texts[1].trim().length;
+const texts = await textOf(saved.bytes); out.p1HasAdded = /Added by PDFView/.test(texts[0]); out.p1HasStamp = /CONFIDENTIAL/.test(texts[0]); out.p1Bullets = /\u2022/.test(texts[0]); out.timesBold = saved.bytes.includes('Times-Bold'); out.tinosEmbedded = /Tinos/.test(saved.bytes.toString('latin1')); out.tinosTextKept = /Tinos text/.test(texts[0]); out.p1Bates = /HAM-00100/.test(texts[0]); out.p2TextAfterRedact = texts[1].trim().length;
 // reopen the saved file: objects and bates come back
 writeFileSync(join(dir, 'reopen.pdf'), saved.bytes); await page.setInputFiles('#fileIn', join(dir, 'reopen.pdf')); await page.waitForTimeout(1500);
 out.reopen = { objects: await page.$$eval('.obj:not(.obj-bates)', e => e.length), bates: await page.$$eval('.obj-bates', e => e.map(x => x.textContent)), toast: await page.textContent('#toast') };

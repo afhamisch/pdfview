@@ -70,7 +70,10 @@ export async function openBytes(bytes, name, { sample = false, quiet = false } =
   if (quiet) return true;
   if (prep.stale) toast('This PDF was changed in another program after it was saved here, so items added earlier are now part of the page and cannot be edited.');
   else if (k) toast(`Opened ${plural(doc.numPages, 'page')} with ${plural(k, 'added item')} you can still move, edit or delete.`);
-  else if (!sample) toast(`Opened ${plural(doc.numPages, 'page')}.`);
+  else if (!sample) {
+    let scan = false; try { const tc = await proxies[0].getTextContent(); scan = tc.items.filter(i => i.str && i.str.trim()).length < 3; } catch {}
+    toast(scan ? `Opened ${plural(doc.numPages, 'page')}. This looks like a scan with no text layer: use OCR to make the text selectable and searchable.` : `Opened ${plural(doc.numPages, 'page')}.`, scan ? 7000 : 3600);
+  }
   return true;
 }
 export function closeDoc() {

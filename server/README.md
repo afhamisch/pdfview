@@ -13,7 +13,7 @@ npm start              # or: node server/src/index.js
 ```
 
 The first start without `ADMIN_TOKEN` generates a token, prints it once and
-writes it to `DATA_DIR/admin-token.txt`. The dashboard asks for that token.
+writes it to `DATA_DIR/admin-token.txt (kept across restarts)`. The dashboard asks for that token.
 The experimental warning from `node:sqlite` is expected.
 
 ## Environment

@@ -12,6 +12,7 @@ import { initSidebar, toggleSide } from './sidebar.js';
 import { makeSample } from './sample.js';
 import { ctxHooks, keyHooks } from './hooks.js';
 import { initDesktop } from './desktop.js';
+import { initFonts } from './fonts.js';
 
 /* theme: 'system' (default), 'light' or 'dark'; Jonathan's palette follows the OS unless overridden */
 const THEME_KEY = 'pdfview.theme', THEMES = ['system', 'light', 'dark'];
@@ -56,7 +57,7 @@ on('doc:close', () => { $('#findbar').hidden = true; });
 const HINT = {
   select: 'Select text to copy it, or click a field to fill it in. Click an added item to select it, drag to move it.',
   text: 'Click on the page where the text should start.', stamp: 'Pick a stamp, then click on the page to place it. Double-click a placed stamp to change its wording.', check: 'Click on the page to place a check mark.', sign: 'Click on the page to place your signature.',
-  highlight: 'Drag across the passage to highlight it.', whiteout: 'Drag a white box over anything you want to cover.',
+  highlight: 'Drag across text to highlight it, or drag a box over anything.', draw: 'Draw freehand with the marker or pen.', shape: 'Drag on the page to draw the shape.', erase: 'Drag over the part you want gone; it is painted white, like correction fluid.', snap: 'Drag a box around the part of the page you want; it is copied as an image, with buttons for the text or a PNG file.', whiteout: 'Drag a white box over anything you want to cover.',
   redact: 'Drag a black box over anything you want to redact. When you save, everything under the boxes is permanently removed from the file.',
   field: 'Click on the page to place the field for the selected signer.'
 };
@@ -101,7 +102,7 @@ import('./ocr.js').then(m => setHooks({ ocrLayer: m.renderOcrLayer }));
 initViewer(); initSearch(); initSidebar();
 const mods = await Promise.all([import('./editor.js'), import('./organize.js'), import('./bates.js'), import('./save.js'), import('./sign/index.js'), import('./ocr.js')].map(p => p.catch(e => { console.warn('module', e); return null; })));
 for (const m of mods) if (m && m.init) m.init();
-await pdfjs();
+await Promise.all([pdfjs(), initFonts()]);
 initDesktop();
 if (location.pathname.startsWith('/sign/') && mods[4]) mods[4].startSigner(location.pathname.slice(6));
 else showRest();

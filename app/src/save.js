@@ -9,6 +9,7 @@ import { EDIT_KEY, hash } from './document.js';
 import { batesBox } from './bates.js';
 import { markDirty } from './editor.js';
 import { layoutLines, boxWidth, PAD, LINE } from './textstyle.js';
+import { embedCustom } from './fonts.js';
 import { keyHooks } from './hooks.js';
 
 const PN = k => PDFName.of(k);
@@ -80,7 +81,14 @@ export async function buildPdf({ editLayer = true } = {}) {
   const helv = await doc.embedFont(StandardFonts.Helvetica), helvB = await doc.embedFont(StandardFonts.HelveticaBold);
   const fontCache = new Map([['helv', helv], ['helv:b', helvB]]);
   const STD = { helv: ['Helvetica', 'HelveticaBold', 'HelveticaOblique', 'HelveticaBoldOblique'], times: ['TimesRoman', 'TimesRomanBold', 'TimesRomanItalic', 'TimesRomanBoldItalic'], courier: ['Courier', 'CourierBold', 'CourierOblique', 'CourierBoldOblique'] };
-  const fontFor = async o => { const fam = STD[o.font] ? o.font : 'helv', key = fam + (o.bold ? ':b' : '') + (o.italic ? ':i' : ''); if (!fontCache.has(key)) fontCache.set(key, await doc.embedFont(StandardFonts[STD[fam][(o.bold ? 1 : 0) + (o.italic ? 2 : 0)]])); return fontCache.get(key); };
+  const fontFor = async o => {
+    const fam = STD[o.font] ? o.font : 'helv', key = (STD[o.font] ? fam : o.font) + (o.bold ? ':b' : '') + (o.italic ? ':i' : '');
+    if (!fontCache.has(key)) {
+      let f = null; if (!STD[o.font]) { try { f = await embedCustom(doc, o); } catch (e) { console.warn('custom font', o.font, e); } }
+      fontCache.set(key, f || await doc.embedFont(StandardFonts[STD[fam][(o.bold ? 1 : 0) + (o.italic ? 2 : 0)]]));
+    }
+    return fontCache.get(key);
+  };
   const flatten = $('#flatten').checked;
   const keptMain = new Set(S.pages.filter(p => p.src === 0).map(p => p.si));
   let form = null; try { form = doc.getForm(); } catch {}
@@ -126,6 +134,24 @@ export async function buildPdf({ editLayer = true } = {}) {
     page.getContentStream(false); // a fresh stream that holds only added items
     for (const o of objs) {
       const bl = offset([o.x, o.y], o.a, 0, o.h || 0), rot = degrees(o.a);
+      if (o.type === 'ink') {
+        const pts = o.pts; if (pts.length < 2) continue;
+        for (let i = 1; i < pts.length; i++) page.drawLine({ start: { x: pts[i - 1][0], y: pts[i - 1][1] }, end: { x: pts[i][0], y: pts[i][1] }, thickness: o.width, color: hexRgb(o.color), lineCap: LineCapStyle.Round, opacity: o.mode === 'marker' ? .42 : 1, blendMode: o.mode === 'marker' ? BlendMode.Multiply : BlendMode.Normal });
+        if (!isRed) { const c = Object.assign({}, o, { page: idx }); delete c.id; kept.push(c); }
+        continue;
+      }
+      if (o.type === 'shape') {
+        const col = hexRgb(o.color), [sx, sy, ex, ey] = o.dir || [0, 0, 1, 1];
+        if (o.kind === 'rect') page.drawRectangle({ x: bl[0], y: bl[1], width: o.w, height: o.h, rotate: rot, borderColor: col, borderWidth: o.width });
+        else if (o.kind === 'ellipse') { const cen = offset([o.x, o.y], o.a, o.w / 2, o.h / 2); page.drawEllipse({ x: cen[0], y: cen[1], xScale: o.w / 2, yScale: o.h / 2, rotate: rot, borderColor: col, borderWidth: o.width }); }
+        else {
+          const a = offset([o.x, o.y], o.a, sx * o.w, sy * o.h), b = offset([o.x, o.y], o.a, ex * o.w, ey * o.h);
+          page.drawLine({ start: { x: a[0], y: a[1] }, end: { x: b[0], y: b[1] }, thickness: o.width, color: col, lineCap: LineCapStyle.Round });
+          if (o.kind === 'arrow') { const ang = Math.atan2(b[1] - a[1], b[0] - a[0]), L = Math.max(6, o.width * 4.5), h = Math.PI / 7; for (const d of [ang - h, ang + h]) page.drawLine({ start: { x: b[0], y: b[1] }, end: { x: b[0] - L * Math.cos(d), y: b[1] - L * Math.sin(d) }, thickness: o.width, color: col, lineCap: LineCapStyle.Round }); }
+        }
+        if (!isRed) { const c = Object.assign({}, o, { page: idx }); delete c.id; kept.push(c); }
+        continue;
+      }
       if (o.type === 'whiteout') page.drawRectangle({ x: bl[0], y: bl[1], width: o.w, height: o.h, rotate: rot, color: rgb(1, 1, 1) });
       else if (o.type === 'redact') page.drawRectangle({ x: bl[0], y: bl[1], width: o.w, height: o.h, rotate: rot, color: rgb(0, 0, 0) });
       else if (o.type === 'highlight') page.drawRectangle({ x: bl[0], y: bl[1], width: o.w, height: o.h, rotate: rot, color: rgb(1, .83, 0), opacity: .42, blendMode: BlendMode.Multiply });

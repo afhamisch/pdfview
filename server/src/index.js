@@ -21,9 +21,11 @@ const RATE_LIMIT = 60, RATE_WINDOW_MS = 60_000;
 mkdirSync(DATA_DIR, { recursive: true });
 let ADMIN_TOKEN = env.ADMIN_TOKEN;
 if (!ADMIN_TOKEN) {
-  ADMIN_TOKEN = randomBytes(24).toString('base64url');
-  writeFileSync(join(DATA_DIR, 'admin-token.txt'), ADMIN_TOKEN + '\n', { mode: 0o600 });
-  console.log(`ADMIN_TOKEN was not set. Generated one and wrote it to ${join(DATA_DIR, 'admin-token.txt')}:\n${ADMIN_TOKEN}`);
+  // keep the same token across restarts so saved sign-ins keep working
+  const tokenFile = join(DATA_DIR, 'admin-token.txt');
+  try { ADMIN_TOKEN = readFileSync(tokenFile, 'utf8').trim(); } catch { ADMIN_TOKEN = ''; }
+  if (!ADMIN_TOKEN) { ADMIN_TOKEN = randomBytes(24).toString('base64url'); writeFileSync(tokenFile, ADMIN_TOKEN + '\n', { mode: 0o600 }); }
+  console.log(`\n==========================================================\n  Admin token (paste it when the app asks for it):\n  ${ADMIN_TOKEN}\n  Also saved in ${tokenFile}\n==========================================================\n`);
 }
 
 const db = openDb(DATA_DIR);
