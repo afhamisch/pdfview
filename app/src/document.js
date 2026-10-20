@@ -4,6 +4,7 @@ import { pdfjs, docOptions } from './pdfjs.js';
 import { S, emit, nextPuid, nextUid } from './state.js';
 import { toast, plural } from './ui.js';
 import { requestRender } from './viewer.js';
+import { stashTab, newTab, busyNow } from './tabs.js';
 
 export const EDIT_KEY = 'EditLayer';
 export function hash(u8) { let h = 0x811c9dc5; for (let i = 0; i < u8.length; i++) { h ^= u8[i]; h = Math.imul(h, 0x01000193) >>> 0; } return h.toString(16) + ':' + u8.length; }
@@ -55,12 +56,13 @@ export async function loadDoc(bytes) {
 
 const mark = n => { try { performance.mark('pdfview:' + n); } catch {} };
 export async function openBytes(bytes, name, { sample = false, quiet = false } = {}) {
+  { const why = busyNow(); if (why) { toast(why); return false; } }
   mark('open-start');
   const prep = await prepare(bytes); bytes = prep.bytes; mark('prepared');
   const r = await loadDoc(bytes); mark('loaded');
   if (!r.doc) { console.error(r.error); toast(r.needsPw ? 'This PDF is password protected. Remove the password, then open it here.' : 'That file could not be opened as a PDF.'); return false; }
   const { doc } = r;
-  destroySources();
+  if (S.doc) stashTab(); S.tab = newTab();
   Object.assign(S, { doc, bytes, name, sample, pages: [], reg: new Map(), sources: new Map([[0, { id: 0, name, bytes, doc }]]), objects: [], sel: null, editing: null, undo: [], dirty: false, fit: 'width', org: false, osel: new Set(), anchor: null, bates: prep.bates || null, meta: {}, formDirty: new Set(), lifts: [], lib: null, hover: null, lifting: false });
   const proxies = await Promise.all(Array.from({ length: doc.numPages }, (_, i) => doc.getPage(i + 1)));
   proxies.forEach((proxy, i) => S.pages.push(newPage(0, i, proxy))); mark('pages');
@@ -77,10 +79,8 @@ export async function openBytes(bytes, name, { sample = false, quiet = false } =
   }
   return true;
 }
-export function closeDoc() {
-  destroySources();
+export function blankDoc() {
   Object.assign(S, { doc: null, bytes: null, name: '', sample: false, pages: [], reg: new Map(), sources: new Map(), objects: [], sel: null, editing: null, undo: [], dirty: false, org: false, osel: new Set(), anchor: null, bates: null, meta: {}, formDirty: new Set(), lifts: [], lib: null, hover: null, lifting: false });
-  emit('doc:close');
 }
 export async function readFile(file) {
   if (!file) return;

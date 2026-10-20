@@ -20,6 +20,7 @@ Viewer
 - print by opening the saved PDF in the browser's own print path
 
 Editor
+- tabs: several PDFs open at once, each with its own state
 - edit existing text: a block lifts off the page as a text object (the
   drawing operators come out of the content stream, position and spacing
   kept, font matched to a bundled lookalike); scans and text in graphics
@@ -66,6 +67,8 @@ OCR
 
 - document compare, bookmark editing, form field creation, OCR languages
   other than English
+- redaction that keeps the rest of the page as text (today the whole
+  redacted page becomes an image; run OCR on it to make it searchable again)
 - mixed styles inside one edited paragraph (a bold word in a regular
   paragraph takes the paragraph's style once lifted)
 - Windows installer built locally: the Tauri wrapper in `desktop/` is built

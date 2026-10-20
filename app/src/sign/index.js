@@ -263,6 +263,7 @@ export function init() {
   $('#sendBtn').addEventListener('click', () => { if (C.active) { setTool('field'); emit('ctx'); } else startCompose(); });
   $('#envBtn').addEventListener('click', () => panelOpen ? closePanel() : openPanel());
   on('doc:open', () => { if (S.mode !== 'sign') { closePanel(); C.active = false; } });
+  on('tab:switch', () => { closePanel(); C.active = false; });
   on('doc:close', () => { C.active = false; });
   keyHooks.push((e) => { if (panelOpen) { if (e.key === 'Escape') closePanel(); return !(e.ctrlKey || e.metaKey); } if (C.active && e.key === 'Escape' && S.sel == null && S.tool === 'select') { stopCompose(false); return true; } return false; });
 }

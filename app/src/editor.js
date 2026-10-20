@@ -13,7 +13,7 @@ import { analyzePage, removeBlock, restoreContents, chooseFont } from './textedi
 import { buildBlocks, blockAt, blockRect } from './blocks.js';
 import { FONTS, PAD, LINE, baselineAt } from './textstyle.js';
 
-export function markDirty() { S.dirty = true; $('#dirtyDot').hidden = false; }
+export function markDirty() { const was = S.dirty; S.dirty = true; $('#dirtyDot').hidden = false; if (!was) emit('dirty'); }
 export function snapshot() { return JSON.stringify({ o: S.objects, p: S.pages.map(p => [p.uid, p.rot]), b: S.bates, l: S.lifts.length }); }
 export function pushUndo() { S.undo.push(snapshot()); if (S.undo.length > 150) S.undo.shift(); $('#undoBtn').disabled = false; }
 export function undo() {
@@ -455,6 +455,7 @@ export function init() {
   $('#undoBtn').addEventListener('click', undo);
   $('#pages').addEventListener('pointermove', hoverMove); $('#pages').addEventListener('pointerleave', clearHover);
   on('doc:open', () => { setTool('select'); clearHover(); $('#undoBtn').disabled = true; $('#flatten').disabled = false; });
+  on('tab:switch', () => { setTool('select'); clearHover(); $('#undoBtn').disabled = !S.undo.length; $('#flatten').disabled = false; renderAllObjs(); });
   on('doc:close', () => { setTool('select'); $('#flatten').disabled = true; $('#flatten').checked = false; });
   keyHooks.push((e, { typing, mod }) => {
     if (anyModalOpen() || S.mode === 'sign') return false;

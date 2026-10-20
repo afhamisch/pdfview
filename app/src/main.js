@@ -2,10 +2,11 @@ import 'pdfjs-dist/web/pdf_viewer.css';
 import './fonts.css';
 import './styles.css';
 import { S, on, emit } from './state.js';
-import { $, $$, el, toast, anyModalOpen } from './ui.js';
+import { $, $$, el, toast, anyModalOpen, ICON } from './ui.js';
 import { SHELL, REST } from './shell.js';
 import { pdfjs } from './pdfjs.js';
-import { openBytes, readFile, closeDoc } from './document.js';
+import { openBytes, readFile } from './document.js';
+import { switchTab, switchBy, closeTab, tabName, tabSample, tabDirty, anyDirty } from './tabs.js';
 import { initViewer, layout, zoomTo, goTo, currentPage, updateNav, setHooks } from './viewer.js';
 import { initSearch, openFind, applyHighlights } from './search.js';
 import { initSidebar, toggleSide } from './sidebar.js';
@@ -27,30 +28,44 @@ document.body.dataset.tool = 'select';
 applyTheme(theme);
 $('#themeBtn').addEventListener('click', () => { theme = THEMES[(THEMES.indexOf(theme) + 1) % THEMES.length]; try { localStorage.setItem(THEME_KEY, theme); } catch {} applyTheme(theme); });
 
-function setFileLabel() {
-  const f = $('#fileName'); f.innerHTML = '';
-  const b = el('b', { text: S.name || 'No file', title: S.name }); b.style.color = S.name ? '' : 'var(--muted)'; f.append(b);
-  if (S.sample) f.append(el('span', { class: 'tag', text: 'Sample' }));
+function renderTabs() {
+  const host = $('#tabs'); if (!host) return; host.innerHTML = '';
+  if (!S.tabs.length) { host.append(el('span', { class: 'nofile', text: 'No file' })); return; }
+  for (const t of S.tabs) {
+    const active = t === S.tab, name = tabName(t) || 'document.pdf';
+    const b = el('div', { class: 'tab', role: 'tab', 'aria-selected': String(active), title: name + (tabDirty(t) ? ' (unsaved changes)' : ''), tabindex: '0', dataset: { tab: t.id } }, el('span', { class: 'nm', text: name }));
+    if (tabSample(t)) b.append(el('span', { class: 'tag', text: 'Sample' }));
+    if (tabDirty(t)) b.append(el('span', { class: 'dot', title: 'Unsaved changes' }));
+    const x = el('button', { class: 'x', type: 'button', title: 'Close', 'aria-label': 'Close ' + name, html: ICON.close });
+    x.addEventListener('click', e => { e.stopPropagation(); requestClose(t); });
+    b.append(x);
+    b.addEventListener('click', () => switchTab(t));
+    b.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); switchTab(t); } });
+    host.append(b);
+  }
+  const cur = host.querySelector('.tab[aria-selected="true"]'); if (cur && cur.scrollIntoView) { try { cur.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch {} }
 }
 export function setEnabled(onOff) {
   $$('#tools .tb,#zoomIn,#zoomOut,#zoomFit,#pgIn,#pgPrev,#pgNext,#saveBtn,#orgBtn,#batesBtn,#ocrBtn,#printBtn,#sendBtn,#findBtn').forEach(b => b.disabled = !onOff);
   $('#undoBtn').disabled = !onOff || !S.undo.length;
-  $('#closeBtn').hidden = !onOff;
   if (!onOff) { $('#zoomPct').textContent = '100%'; $('#pgIn').value = ''; $('#pgOf').textContent = 'of 0'; }
 }
 export function showRest() {
   $('#pages').innerHTML = REST;
   $('#restOpen').addEventListener('click', () => $('#fileIn').click());
   $('#restSample').addEventListener('click', loadSample);
-  setFileLabel(); setEnabled(false); $('#dirtyDot').hidden = true; emit('ctx');
+  renderTabs(); setEnabled(false); $('#dirtyDot').hidden = true; emit('ctx');
 }
 async function loadSample() { try { await openBytes(new Uint8Array(await makeSample()), 'sample-intake-form.pdf', { sample: true }); } catch (e) { console.error(e); toast('The sample form could not be created.'); } }
-let closeArmed = 0;
-function requestClose() {
-  if (S.dirty && !S.sample && Date.now() - closeArmed > 4000) { closeArmed = Date.now(); toast('You have unsaved changes. Click close again to close without saving.'); return; }
-  closeArmed = 0; closeDoc(); showRest();
+let closeArmed = { id: 0, at: 0 };
+function requestClose(t) {
+  if (!t) return;
+  if (tabDirty(t) && !(closeArmed.id === t.id && Date.now() - closeArmed.at < 4000)) { closeArmed = { id: t.id, at: Date.now() }; toast(`${tabName(t)} has unsaved changes. Click its close button again to close it without saving.`); return; }
+  closeArmed = { id: 0, at: 0 }; closeTab(t); if (!S.tabs.length) showRest();
 }
-on('doc:open', () => { setFileLabel(); setEnabled(true); $('#dirtyDot').hidden = true; emit('ctx'); });
+on('doc:open', () => { renderTabs(); setEnabled(true); $('#dirtyDot').hidden = true; emit('ctx'); });
+on('tab:switch', () => { renderTabs(); setEnabled(true); $('#dirtyDot').hidden = !S.dirty; $('#undoBtn').disabled = !S.undo.length; emit('ctx'); });
+on('tabs:changed', renderTabs); on('dirty', renderTabs);
 on('doc:close', () => { $('#findbar').hidden = true; });
 
 /* ---------- context strip ---------- */
@@ -70,13 +85,11 @@ on('ctx', () => {
 
 /* ---------- wiring ---------- */
 $('#openBtn').addEventListener('click', () => $('#fileIn').click());
-$('#closeBtn').addEventListener('click', requestClose);
-$('#fileIn').addEventListener('change', async e => {
-  const files = [...e.target.files]; e.target.value = '';
-  if (!files.length) return;
-  // several files: the first opens, the others are appended as pages (combine)
-  if (await readFile(files[0]) && files.length > 1) emit('files:append', files.slice(1));
-});
+async function openFiles(files) {
+  let n = 0; for (const f of files) if (await readFile(f)) n++;
+  if (n > 1) toast(`Opened ${n} files, one per tab. To combine files into one, use Organize and Insert.`);
+}
+$('#fileIn').addEventListener('change', e => { const files = [...e.target.files]; e.target.value = ''; if (files.length) openFiles(files); });
 $('#findBtn').addEventListener('click', openFind);
 let dragN = 0;
 addEventListener('dragenter', e => { if ([...(e.dataTransfer?.types || [])].includes('Files')) { dragN++; $('#dropHint').textContent = S.org ? 'Drop the PDF to insert its pages' : 'Drop the PDF to open it'; $('#dropHint').hidden = false; } });
@@ -84,8 +97,8 @@ addEventListener('dragleave', () => { dragN = Math.max(0, dragN - 1); if (!dragN
 addEventListener('dragover', e => e.preventDefault());
 addEventListener('drop', e => { e.preventDefault(); dragN = 0; $('#dropHint').hidden = true; const fs = [...(e.dataTransfer?.files || [])]; if (!fs.length || anyModalOpen()) return; if (fs.length > 1 && !S.org) emit('drop:many', fs); else emit('drop', fs[0]); });
 on('drop', f => { if (!S.org) readFile(f); });
-on('drop:many', async files => { if (S.org || !files.length) return; if (await readFile(files[0]) && files.length > 1) emit('files:append', files.slice(1)); });
-addEventListener('beforeunload', e => { if (S.dirty && !S.sample) { e.preventDefault(); e.returnValue = ''; } });
+on('drop:many', files => { if (S.org || !files.length) return; openFiles(files); });
+addEventListener('beforeunload', e => { if (anyDirty()) { e.preventDefault(); e.returnValue = ''; } });
 
 addEventListener('keydown', e => {
   const typing = e.target.closest && e.target.closest('input,textarea,select,[contenteditable="true"],[contenteditable="plaintext-only"]');
@@ -95,6 +108,9 @@ addEventListener('keydown', e => {
   if (anyModalOpen() || typing) return;
   if (mod && S.doc && !S.org && (e.key === '=' || e.key === '+' || e.key === '-' || e.key === '0')) { e.preventDefault(); e.key === '0' ? zoomTo(0, 'width') : zoomTo(S.scale * (e.key === '-' ? 1 / 1.2 : 1.2), null); return; }
   if (mod && e.key.toLowerCase() === 'b' && S.doc) { e.preventDefault(); toggleSide(); return; }
+  // Ctrl+] and Ctrl+[ work in a browser; Ctrl+PageDown, Ctrl+PageUp and Ctrl+Tab reach the page only in the desktop app
+  if (mod && (e.key === 'PageDown' || e.key === 'PageUp' || e.key === 'Tab' || e.key === ']' || e.key === '[') && S.tabs.length > 1) { e.preventDefault(); switchBy(e.key === 'PageUp' || e.key === '[' || (e.key === 'Tab' && e.shiftKey) ? -1 : 1); return; }
+  if (mod && e.key.toLowerCase() === 'w' && S.tab && !e.shiftKey) { e.preventDefault(); requestClose(S.tab); return; }
 });
 
 setHooks({ afterTextLayer: p => applyHighlights(p) });

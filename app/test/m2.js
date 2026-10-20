@@ -68,9 +68,11 @@ await page.keyboard.press('Escape'); await page.waitForTimeout(400);
 out.pgAfterOrg = await page.$$eval('.pg .src-note, .pg-lbl', e => e.length);
 const saved2 = await dl(() => page.click('#saveBtn')); const d2 = await PDFDocument.load(saved2.bytes); out.saved2Pages = d2.getPageCount();
 const t2 = await textOf(saved2.bytes); out.firstPageNowTerms = /Terms of engagement/.test(t2[0]) || t2[0].length < 40;
-// combine: open two files at once; the second is appended
-await page.setInputFiles('#fileIn', [join(dir, 'reopen.pdf'), join(dir, 'reopen.pdf')]); await page.waitForFunction(() => /Combined/.test(document.querySelector('#toast').textContent), null, { timeout: 30000 }); out.combined = { pages: await page.$$eval('.pg', e => e.length) };
-const comb = await dl(() => page.click('#saveBtn')); out.combined.savedPages = (await PDFDocument.load(comb.bytes)).getPageCount();
+// open two files at once: each gets its own tab; then back to the reopened file's tab
+await page.setInputFiles('#fileIn', [join(dir, 'reopen.pdf'), join(dir, 'reopen.pdf')]); await page.waitForFunction(() => document.querySelectorAll('#tabs .tab').length === 4, null, { timeout: 30000 }); await page.waitForTimeout(400);
+out.tabs = { count: await page.$$eval('#tabs .tab', e => e.length), pages: await page.$$eval('.pg', e => e.length) };
+await page.click('#tabs .tab:nth-child(4) .x'); await page.waitForTimeout(200); await page.click('#tabs .tab:nth-child(3) .x'); await page.waitForTimeout(300); await page.click('#tabs .tab:nth-child(2)'); await page.waitForTimeout(400);
+out.tabs.after = await page.$$eval('#tabs .tab', e => e.length); out.tabs.activeName = await page.$eval('#tabs .tab[aria-selected="true"] .nm', e => e.textContent);
 // flatten: save again with the checkbox on; the form is gone but the values remain as page text
 await page.check('#flatten'); const saved3 = await dl(() => page.click('#saveBtn')); await page.uncheck('#flatten');
 const d3 = await PDFDocument.load(saved3.bytes); let nf = -1; try { nf = d3.getForm().getFields().length; } catch { nf = 0; }
