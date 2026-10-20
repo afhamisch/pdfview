@@ -41,7 +41,7 @@ async function ocrPage(p, w) {
     words.push({ text, tl, br, w: (x1 - x0) / vp.scale, h: (y1 - y0) / vp.scale, conf: Math.round(wd.confidence), eol: wd === line.words[line.words.length - 1] });
   }
   p.ocr = { words, rot: rotOf(p), at: Date.now() };
-  p.text = null; // search cache rebuilt with the new words
+  p.text = null; p.edit = null; // search cache and editable blocks rebuilt with the new words
   renderOcrLayer(p);
   return words.length;
 }

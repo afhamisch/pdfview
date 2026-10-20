@@ -49,7 +49,12 @@ saved copy as invisible text so Acrobat, Edge and e-filing portals can search
 it too. Available in the served app and the desktop wrapper (the engine files
 are about 15 MB and are not inlined into the single offline file).
 
-Editor: fill form fields, add text with fonts (Helvetica, Times, Courier, plus
+Editor: edit the text that is already on the page (with the Text tool, click a
+paragraph, heading or table cell: it lifts off the page as an editable text
+box with the same wording, size, color, spacing and a matching font, the old
+wording is removed from the file, and you can retype, add to or move it; words
+in scans and text inside graphics are covered with white and retyped
+instead); fill form fields, add text with fonts (Helvetica, Times, Courier, plus
 bundled open fonts such as Tinos, Arimo, Cousine, EB Garamond, Crimson Pro,
 Libre Baskerville and DejaVu, and any TrueType or OpenType font dropped into
 `app/fonts`), bold, italic, underline, alignment including justified, bullets

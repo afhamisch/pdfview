@@ -8,7 +8,7 @@ import { $, toast, plural } from './ui.js';
 import { EDIT_KEY, hash } from './document.js';
 import { batesBox } from './bates.js';
 import { markDirty } from './editor.js';
-import { layoutLines, boxWidth, PAD, LINE } from './textstyle.js';
+import { layoutLines, boxWidth, PAD, baselineAt } from './textstyle.js';
 import { embedCustom } from './fonts.js';
 import { keyHooks } from './hooks.js';
 
@@ -169,7 +169,7 @@ export async function buildPdf({ editLayer = true } = {}) {
         const font = await fontFor(o), measure = str => font.widthOfTextAtSize(clean(str, font), o.size);
         const lines = layoutLines(Object.assign({}, o, { text: clean(o.text, font) }), measure), W = boxWidth(o, lines), col = hexRgb(o.color);
         lines.forEach((ln, i) => {
-          const base = PAD + o.size * (LINE * i + 0.93), ulY = base + o.size * 0.14, ulT = Math.max(.5, o.size * 0.06);
+          const base = PAD + o.size * baselineAt(o, i), ulY = base + o.size * 0.14, ulT = Math.max(.5, o.size * 0.06);
           let x = PAD; const avail = W - ln.indent;
           if (o.align === 'center') x += ln.indent + (avail - ln.width) / 2; else if (o.align === 'right') x += ln.indent + avail - ln.width; else x += ln.indent;
           if (ln.prefix) { const bp = offset([o.x, o.y], o.a, PAD, base); page.drawText(ln.prefix, { x: bp[0], y: bp[1], size: o.size, font, color: col, rotate: rot }); }

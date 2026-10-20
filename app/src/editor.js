@@ -8,9 +8,13 @@ import { openSig } from './signature.js';
 import { applyStyle, displayText, textToolbar } from './textstyle.js';
 import { initSignature } from './signature.js';
 import { ctxHooks, keyHooks } from './hooks.js';
+import { libDoc, reloadMain } from './document.js';
+import { analyzePage, removeBlock, restoreContents, chooseFont } from './textedit.js';
+import { buildBlocks, blockAt, blockRect } from './blocks.js';
+import { FONTS, PAD, LINE, baselineAt } from './textstyle.js';
 
 export function markDirty() { S.dirty = true; $('#dirtyDot').hidden = false; }
-export function snapshot() { return JSON.stringify({ o: S.objects, p: S.pages.map(p => [p.uid, p.rot]), b: S.bates }); }
+export function snapshot() { return JSON.stringify({ o: S.objects, p: S.pages.map(p => [p.uid, p.rot]), b: S.bates, l: S.lifts.length }); }
 export function pushUndo() { S.undo.push(snapshot()); if (S.undo.length > 150) S.undo.shift(); $('#undoBtn').disabled = false; }
 export function undo() {
   if (!S.undo.length) return;
@@ -24,6 +28,58 @@ export function undo() {
   else if (before !== S.pages.map(p => p.uid).join(',')) { buildPages(); emit('pages:changed'); }
   else layout();
   emit('ctx');
+  if (S.lifts.length > (st.l || 0)) revertLifts(st.l || 0).catch(e => { console.error(e); toast('The page text could not be put back.'); });
+}
+
+/* ---------- editing text that is already on the page ---------- */
+// Blocks of existing text per page: from the content stream (removable) or, for OCR words, text
+// inside graphics and pages from inserted files, only coverable.
+async function pageBlocks(p) {
+  const ocrAt = p.ocr ? p.ocr.at : 0;
+  if (p.edit && p.edit.ocrAt === ocrAt) return p.edit.blocks;
+  if (p.editBusy) return null;
+  p.editBusy = (async () => {
+    const tc = await p.proxy.getTextContent({ includeMarkedContent: false });
+    let blocks = [], an = null;
+    const hasText = tc.items.some(it => it.str && it.str.trim());
+    if (p.src === 0 && hasText) { const lib = await libDoc(); an = await analyzePage(lib, p.si, tc.items, tc.styles); blocks = an.blocks; }
+    else if (hasText) blocks = buildBlocks(tc.items, tc.styles).map(b => Object.assign(b, { covered: true }));
+    if (p.ocr && p.ocr.words.length) {
+      const rot = p.ocr.rot, { c, s: sn } = frame(rot);
+      const items = p.ocr.words.map(w => { const size = w.h * 1.15, b = offset(w.tl, rot, 0, w.h * 0.82); return { str: w.text + ' ', transform: [size * c, size * sn, -size * sn, size * c, b[0], b[1]], width: w.w, height: w.h, fontName: 'ocr' }; });
+      blocks = blocks.concat(buildBlocks(items, { ocr: { ascent: 0.8, descent: 0.2 } }).map(b => Object.assign(b, { covered: true, ocr: true })));
+    }
+    p.edit = { blocks, an, ocrAt }; p.editBusy = null;
+  })().catch(e => { console.warn('blocks', e); p.edit = { blocks: [], an: null, ocrAt }; p.editBusy = null; });
+  return null;
+}
+export function clearHover() { if (S.hover) { S.hover.box.remove(); S.hover = null; } }
+function hoverMove(e) {
+  if (S.tool !== 'text' || S.editing != null || S.lifting || S.org || S.mode === 'sign') { clearHover(); return; }
+  const sec = e.target.closest && e.target.closest('.pg'), p = sec && PG(+sec.dataset.uid);
+  if (!p || !p.vp) { clearHover(); return; }
+  const blocks = p.edit && p.edit.ocrAt === (p.ocr ? p.ocr.at : 0) ? p.edit.blocks : null;
+  if (!blocks) { pageBlocks(p); clearHover(); return; }
+  const bl = blockAt(blocks, toWorld(p, e));
+  if (S.hover && (S.hover.bl !== bl || S.hover.p !== p || !S.hover.box.isConnected)) clearHover();
+  if (bl && !S.hover) { const box = el('div', { class: 'liftbox', title: bl.covered ? 'Click to edit (the original is covered)' : 'Click to edit this text' }); place(box, p, blockRect(bl, 2, 1)); p.ol.append(box); S.hover = { p, bl, box }; }
+}
+async function commitLib() { const bytes = await S.lib.save({ updateFieldAppearances: false }); await reloadMain(bytes); }
+async function revertLifts(n) { const lib = await libDoc(); while (S.lifts.length > n) restoreContents(lib, S.lifts.pop()); await commitLib(); }
+/* Take a block off the page and hand it to the editor as a text object. */
+export async function liftBlock(p, bl) {
+  if (S.lifting) return; S.lifting = true; clearHover();
+  try {
+    const fi = bl.fontInfo ? chooseFont(bl.fontInfo, FONTS) : { font: bl.ocr ? S.textStyle.font : 'helv', bold: false, italic: false };
+    const o = { type: 'text', text: bl.text, size: Math.round(bl.size * 100) / 100, color: bl.color || '#111111', font: fi.font, bold: fi.bold, italic: fi.italic, underline: false, align: bl.align, list: 'none', lead: Math.round(bl.lead * 1000) / 1000 };
+    const s0 = bl.s0 - PAD, top = bl.b1 + o.size * baselineAt(o, 0) + PAD, W = bl.s1 - bl.s0;
+    Object.assign(o, { x: bl.u[0] * s0 + bl.n[0] * top, y: bl.u[1] * s0 + bl.n[1] * top, a: ((bl.angle % 360) + 360) % 360, w: W + 2 * PAD + 2 + W * 0.01 });
+    pushUndo();
+    if (!bl.covered && p.src === 0 && p.edit && p.edit.an) { const lib = await libDoc(); S.lifts.push(removeBlock(lib, p.si, p.edit.an, bl)); await commitLib(); }
+    else { const r = blockRect(bl, 1, 1); addObj(p, { type: 'whiteout', x: r.x, y: r.y, w: r.w, h: r.h, a: r.a }); toast(bl.ocr ? 'Recognized text: the scanned words are covered with white and the text is typed on top.' : 'This text is part of a graphic, so it is covered with white and typed on top.', 5000); }
+    const obj = addObj(p, o); setTool('select'); setTimeout(() => startEdit(obj), 0);
+  } catch (e) { console.error(e); toast('That text could not be opened for editing.'); }
+  finally { S.lifting = false; }
 }
 
 /* ---------- objects ---------- */
@@ -38,7 +94,7 @@ export function renderAllObjs() { S.pages.forEach(renderObjs); }
 function objEl(p, o) {
   const d = el('div', { class: 'obj obj-' + o.type + (S.sel === o.id ? ' sel' : '') + (o.type === 'field' ? ' sc' + ((o.signer % 5) + 1) : ''), dataset: { id: o.id } });
   if (o.type === 'text') {
-    const t = el('div', { class: 'txt', text: displayText(o), style: { fontSize: o.size * S.scale + 'px', color: o.color, padding: 2 * S.scale + 'px' } });
+    const t = el('div', { class: 'txt', text: displayText(o), style: { fontSize: o.size * S.scale + 'px', color: o.color, padding: 2 * S.scale + 'px', lineHeight: String(o.lead || LINE) } });
     if (!o.box) applyStyle(t, o);
     if (o.box) { d.classList.add('boxed'); t.style.borderWidth = Math.max(1, 1.5 * S.scale) + 'px'; t.style.borderColor = o.color; t.style.padding = `${3 * S.scale}px ${6 * S.scale}px`; }
     d.append(t); d.addEventListener('dblclick', () => startEdit(o));
@@ -135,6 +191,8 @@ function sheetDown(p, e) {
   }
   e.preventDefault();
   if (tool === 'text') {
+    const bl = S.hover && S.hover.p === p ? S.hover.bl : (p.edit ? blockAt(p.edit.blocks, P) : null);
+    if (bl) { liftBlock(p, bl); return; }
     pushUndo(); const tl = offset(P, R, -2, -(S.tsize * 0.75 + 2));
     const o = addObj(p, Object.assign({ type: 'text', x: tl[0], y: tl[1], a: R, text: '', size: S.tsize, color: S.tcolor }, S.textStyle));
     setTool('select'); setTimeout(() => startEdit(o), 0);
@@ -275,6 +333,7 @@ export function setTool(t) {
   if (t !== 'select' && (!S.doc || S.org)) return;
   if (t === 'sign' && !S.sig) { openSig().then(sig => { if (sig) { S.sig = sig; setTool('sign'); toast('Click on the page where the signature goes.'); } }); return; }
   if (S.tool === 'snap' && t !== 'snap') clearSnap();
+  if (t !== 'text') clearHover();
   S.tool = t; document.body.dataset.tool = t;
   $$('#tools [data-tool]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.tool === t)));
   if (t !== 'select' && S.sel != null) { S.sel = null; renderAllObjs(); }
@@ -328,6 +387,7 @@ function renderCtx(c) {
       c.append(el('span', { class: 'lbl', text: 'Text' }));
       const target = Object.assign({ size: S.tsize, color: S.tcolor }, S.textStyle);
       textToolbar(c, target, { isDefault: true, onChange: mut => { mut(target); S.tsize = target.size; S.tcolor = target.color; const { size, color, ...rest } = target; S.textStyle = rest; emit('ctx'); } });
+      c.append(el('span', { class: 'hint', text: 'Click text on the page to edit it, or click an empty spot to add text.' }));
       return true;
     }
     return false;
@@ -380,7 +440,8 @@ export function init() {
     setTool(t);
   }));
   $('#undoBtn').addEventListener('click', undo);
-  on('doc:open', () => { setTool('select'); $('#undoBtn').disabled = true; $('#flatten').disabled = false; });
+  $('#pages').addEventListener('pointermove', hoverMove); $('#pages').addEventListener('pointerleave', clearHover);
+  on('doc:open', () => { setTool('select'); clearHover(); $('#undoBtn').disabled = true; $('#flatten').disabled = false; });
   on('doc:close', () => { setTool('select'); $('#flatten').disabled = true; $('#flatten').checked = false; });
   keyHooks.push((e, { typing, mod }) => {
     if (anyModalOpen() || S.mode === 'sign') return false;

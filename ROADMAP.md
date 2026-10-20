@@ -20,6 +20,10 @@ Viewer
 - print by opening the saved PDF in the browser's own print path
 
 Editor
+- edit existing text: a block lifts off the page as a text object (the
+  drawing operators come out of the content stream, position and spacing
+  kept, font matched to a bundled lookalike); scans and text in graphics
+  are covered and retyped
 - fill form fields, add text (standard and bundled or user-supplied fonts,
   size, bold, italic, underline, left, center, right and justified, bullets
   and numbering, color, wrapping boxes), stamps with presets, freehand
@@ -62,6 +66,8 @@ OCR
 
 - document compare, bookmark editing, form field creation, OCR languages
   other than English
+- mixed styles inside one edited paragraph (a bold word in a regular
+  paragraph takes the paragraph's style once lifted)
 - Windows installer built locally: the Tauri wrapper in `desktop/` is built
   by the GitHub Actions workflow on a Windows runner
 - PKCS#7 digital signatures and trusted timestamps on completed envelopes
