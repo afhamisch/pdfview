@@ -215,20 +215,7 @@ async function doInsert() {
   } catch (e) { console.error(e); toast('Those pages could not be inserted.'); $('#insGo').disabled = false; }
 }
 
-// Append every page of the given files after the current last page (used when several files are opened together).
-export async function appendFiles(files) {
-  let added = 0, names = [];
-  for (const f of files) {
-    const src = await loadSource(f); if (!src) continue;
-    const recs = []; for (let i = 0; i < src.doc.numPages; i++) recs.push(newPage(src.id, i, await src.doc.getPage(i + 1)));
-    S.sources.set(src.id, src); S.pages.push(...recs); added += recs.length; names.push(src.name);
-  }
-  if (!added) return;
-  markDirty(); if (S.org) renderOrg(); else buildPages(); emit('pages:changed'); emit('ctx');
-  toast(`Combined: added ${plural(added, 'page')} from ${names.join(', ')}. Save to keep the combined file.`);
-}
 export function init() {
-  on('files:append', appendFiles);
   $('#orgBtn').addEventListener('click', () => S.org ? closeOrg() : openOrg());
   $('#org').addEventListener('pointerdown', e => { const bare = e.target.id === 'org' || e.target.id === 'orgGrid' || e.target.classList.contains('org-hint'); if (bare && S.osel.size && !(e.ctrlKey || e.metaKey || e.shiftKey)) { S.osel = new Set(); updateSelUI(); } });
   $('#insFile').addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; loadInsert(f, insPos); });
@@ -241,6 +228,7 @@ export function init() {
   on('org:render', renderOrg);
   on('drop', f => { if (S.org && S.doc && $('#insModal').hidden) loadInsert(f, defaultPos()); });
   on('doc:open', () => { if (S.org) leaveOrgUI(); });
+  on('tab:switch', () => { if (S.org) leaveOrgUI(); });
   keyHooks.push((e, { typing, mod }) => {
     if (!$('#insModal').hidden) { if (e.key === 'Escape') closeIns(false); return true; }
     if (!S.org || typing) return false;

@@ -27,14 +27,27 @@ export const linkService = {
   executeSetOCGState() {}, getAttachmentContent: async () => null
 };
 
-export function buildPages() {
-  const host = $('#pages'); host.innerHTML = '';
+function makeObservers() {
   if (io) io.disconnect(); if (ioFar) ioFar.disconnect();
   io = new IntersectionObserver(es => es.forEach(e => {
     const p = PG(+e.target.dataset.uid); if (!p) return; p.visible = e.isIntersecting;
     if (p.visible) requestRender(p); else if (p.task) { try { p.task.cancel(); } catch {} }
   }), { root: scroller(), rootMargin: '900px 0px' });
   ioFar = new IntersectionObserver(es => es.forEach(e => { const p = PG(+e.target.dataset.uid); if (p && !e.isIntersecting) releaseCanvas(p); }), { root: scroller(), rootMargin: '3000px 0px' });
+}
+// Park the current page elements in a tab record (see tabs.js) and bring another tab's back.
+export function detachPages(tab) {
+  const host = $('#pages'); tab.scrollTop = scroller().scrollTop; tab.sections = [...host.children]; host.innerHTML = '';
+  if (io) io.disconnect(); if (ioFar) ioFar.disconnect(); RQ.q.clear();
+  S.pages.forEach(p => { p.visible = false; if (p.task) { try { p.task.cancel(); } catch {} p.task = null; p.key = ''; } });
+}
+export function attachPages(tab) {
+  const host = $('#pages'); host.innerHTML = ''; makeObservers();
+  (tab.sections || []).forEach(sec => { host.append(sec); io.observe(sec); ioFar.observe(sec); }); tab.sections = null;
+  layout(); updateNav(); scroller().scrollTop = tab.scrollTop || 0;
+}
+export function buildPages() {
+  const host = $('#pages'); host.innerHTML = ''; makeObservers();
   const N = S.pages.length;
   S.pages.forEach((p, idx) => {
     const n = idx + 1;

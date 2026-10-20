@@ -7,8 +7,7 @@ export const SHELL = `
     <div class="brand">${ICON.open.replace('<svg', '<svg width="18" height="18"')}<span>PDFView</span></div>
     <button class="btn" id="openBtn" type="button">${ICON.open}Open</button>
     <input type="file" id="fileIn" accept="application/pdf,.pdf" multiple hidden><input type="file" id="insFile" accept="application/pdf,.pdf" hidden>
-    <div class="file" id="fileName"><b>No file</b></div>
-    <button class="ib" id="closeBtn" type="button" title="Close PDF" aria-label="Close PDF" hidden>${ICON.close}</button>
+    <div class="tabs" id="tabs" role="tablist" aria-label="Open files"></div>
     <div class="grp">
       <button class="tb" id="sideBtn" aria-pressed="false" title="Pages and bookmarks">${ICON.side}</button>
       <button class="tb" id="findBtn" title="Find (Ctrl+F)">${ICON.find}</button>

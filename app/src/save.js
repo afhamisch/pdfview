@@ -2,7 +2,7 @@
 // order and rotation, Bates numbers, redactions and the editable layer, and drops unreferenced objects.
 import { PDFDocument, PDFName, PDFDict, PDFArray, PDFRef, PDFStream, PDFHexString, PDFTextField, PDFCheckBox, StandardFonts, rgb, degrees, BlendMode, LineCapStyle } from 'pdf-lib';
 import { pdfjsLib as lib, docOptions } from './pdfjs.js';
-import { S, on, coveredWords } from './state.js';
+import { S, on, emit, coveredWords } from './state.js';
 import { offset, rotOf } from './geometry.js';
 import { $, toast, plural } from './ui.js';
 import { EDIT_KEY, hash } from './document.js';
@@ -29,7 +29,7 @@ async function rasterize(pp, rects) {
   const blob = await new Promise((res, rej) => c.toBlob(b => b ? res(b) : rej(new Error('image')), 'image/jpeg', 0.92));
   c.width = c.height = 0; return new Uint8Array(await blob.arrayBuffer());
 }
-const PAGE_EXTRAS = ['Annots', 'Thumb', 'PieceInfo', 'Metadata', 'StructParents', 'B', 'AA', 'Group', 'Tabs', 'LastModified', 'SeparationInfo'];
+const PAGE_EXTRAS = ['Annots', 'Thumb', 'PieceInfo', 'Metadata', 'StructParents', 'B', 'AA', 'Group', 'Tabs', 'LastModified', 'SeparationInfo', 'AF', 'OutputIntents', 'VP'];
 function emptyPageNode(doc, node) { node.set(PN('Contents'), doc.context.obj([])); node.set(PN('Resources'), doc.context.obj({})); PAGE_EXTRAS.forEach(k => node.delete(PN(k))); }
 async function applyRedactions(doc, idxs, rectsAt) {
   const bytes1 = await doc.save({ updateFieldAppearances: false });
@@ -46,12 +46,16 @@ async function applyRedactions(doc, idxs, rectsAt) {
     if (onRed.every(Boolean)) { try { form.removeField(f); } catch (e) { console.warn('remove field', e); } }
     else for (let i = onRed.length - 1; i >= 0; i--) if (onRed[i]) { try { f.acroField.removeWidget(i); } catch {} }
   }
+  // resources inherited from the page tree would keep the redacted pages' fonts and images alive: give every
+  // kept page its own copy of what it inherits, then drop the shared entries
+  for (const pg of pages) { try { if (!pg.node.get(PN('Resources'))) { const r = pg.node.Resources(); if (r) pg.node.set(PN('Resources'), r); } } catch {} }
+  for (const pg of pages) { try { let n = pg.node.Parent(); while (n) { n.delete(PN('Resources')); n = n.Parent ? n.Parent() : null; } } catch {} }
   for (const s of shots) {
     const node = pages[s.idx].node, img = await doc.embedJpg(s.jpg), [x0, y0, x1, y1] = s.view, f = v => (+v).toFixed(4);
     const cs = doc.context.flateStream(`q\n${f(x1 - x0)} 0 0 ${f(y1 - y0)} ${f(x0)} ${f(y0)} cm\n/Redacted Do\nQ\n`);
     emptyPageNode(doc, node); node.set(PN('Contents'), doc.context.register(cs)); node.set(PN('Resources'), doc.context.obj({ XObject: { Redacted: img.ref } }));
   }
-  const cat = doc.catalog; ['StructTreeRoot', 'MarkInfo', 'Metadata', 'PieceInfo', 'AA', 'SpiderInfo'].forEach(k => cat.delete(PN(k)));
+  const cat = doc.catalog; ['StructTreeRoot', 'MarkInfo', 'Metadata', 'PieceInfo', 'AA', 'SpiderInfo', 'AF', 'Collection', 'Requirements', 'Extensions'].forEach(k => cat.delete(PN(k)));
   try { const oa = cat.lookup(PN('OpenAction')); if (oa instanceof PDFDict && String(oa.lookup(PN('S'))) === '/JavaScript') cat.delete(PN('OpenAction')); } catch {}
   try { const nm = cat.lookup(PN('Names')); if (nm instanceof PDFDict) ['EmbeddedFiles', 'JavaScript'].forEach(k => nm.delete(PN(k))); } catch {}
   try { const info = doc.context.lookup(doc.context.trailerInfo.Info); if (info instanceof PDFDict) ['Title', 'Author', 'Subject', 'Keywords', 'Creator'].forEach(k => info.delete(PN(k))); } catch {}
@@ -209,24 +213,24 @@ export async function save(confirmed) {
   if (document.activeElement?.blur) document.activeElement.blur();
   const rst = redStats();
   if (rst.n && confirmed !== true) { $('#redLead').textContent = `${plural(rst.n, 'redaction')} on ${plural(rst.pages, 'page')} will be applied to the saved copy.`; $('#redModal').hidden = false; $('#redCancel').focus(); return; }
-  const btn = $('#saveBtn'); busy = true; btn.disabled = true;
+  const btn = $('#saveBtn'); busy = true; S.saving = true; btn.disabled = true;
   try {
     const { bytes, redacted } = await buildPdf(); const filename = outputName(redacted);
     if (typeof window.pdfviewSaveHook === 'function') { const ok = await window.pdfviewSaveHook({ filename, bytes }); if (ok === false) { toast('Save cancelled.'); return; } }
     else { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' })); a.download = filename; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); }
-    S.dirty = false; $('#dirtyDot').hidden = true;
+    S.dirty = false; $('#dirtyDot').hidden = true; emit('dirty');
     toast(redacted ? `Saved ${filename} with ${plural(rst.n, 'redaction')} applied.` : 'Saved ' + filename);
   } catch (e) { console.error(e); toast('This PDF could not be saved. It may be encrypted or damaged.'); }
-  finally { busy = false; btn.disabled = false; }
+  finally { busy = false; S.saving = false; btn.disabled = false; }
 }
 export async function print() {
-  if (!S.doc || busy) return; busy = true; $('#printBtn').disabled = true;
+  if (!S.doc || busy) return; busy = true; S.saving = true; $('#printBtn').disabled = true;
   try {
     const { bytes } = await buildPdf(); const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
     const w = window.open(url, '_blank'); if (!w) toast('Allow pop-ups for this page to print.'); else toast('The PDF opened in a new tab. Use the browser print button there (Ctrl+P).');
     setTimeout(() => URL.revokeObjectURL(url), 60000);
   } catch (e) { console.error(e); toast('This PDF could not be prepared for printing.'); }
-  finally { busy = false; $('#printBtn').disabled = false; }
+  finally { busy = false; S.saving = false; $('#printBtn').disabled = false; }
 }
 export function init() {
   $('#saveBtn').addEventListener('click', () => save());

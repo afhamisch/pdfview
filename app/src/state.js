@@ -10,8 +10,12 @@ export const S = {
   org: false, osel: new Set(), anchor: null, orgReturn: null,
   lifts: [], lib: null, hover: null, lifting: false, // text lifted off the page for editing (see textedit.js): undo records and the cached pdf-lib document
   bates: null,           // { prefix, start, pad, corner, size } or null
-  meta: {}               // misc: outline, title
+  meta: {},              // misc: outline, title
+  saving: false,         // a save or print is building the file: tabs stay put until it is done
+  tabs: [], tab: null    // open documents (see tabs.js); the fields in DOC_KEYS belong to the active tab
 };
+// Everything that belongs to one open document rather than to the app.
+export const DOC_KEYS = ['doc', 'bytes', 'name', 'sample', 'sources', 'pages', 'reg', 'scale', 'fit', 'objects', 'sel', 'editing', 'undo', 'dirty', 'bates', 'meta', 'formDirty', 'lifts', 'lib', 'hover', 'lifting', 'org', 'osel', 'anchor', 'orgReturn', 'snap'];
 export const bus = new EventTarget();
 export const emit = (type, detail) => bus.dispatchEvent(new CustomEvent(type, { detail }));
 export const on = (type, fn) => bus.addEventListener(type, e => fn(e.detail));

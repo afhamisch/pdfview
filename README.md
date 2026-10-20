@@ -49,6 +49,11 @@ saved copy as invisible text so Acrobat, Edge and e-filing portals can search
 it too. Available in the served app and the desktop wrapper (the engine files
 are about 15 MB and are not inlined into the single offline file).
 
+Several PDFs open at once, one per tab: each keeps its pages, placed items,
+typed form values, undo history and scroll position. Ctrl+] and Ctrl+[ switch
+tabs; in the desktop app Ctrl+PageDown, Ctrl+PageUp, Ctrl+Tab and Ctrl+W work
+too (a browser keeps those for its own tabs).
+
 Editor: edit the text that is already on the page (with the Text tool, click a
 paragraph, heading or table cell: it lifts off the page as an editable text
 box with the same wording, size, color, spacing and a matching font, the old
@@ -62,10 +67,9 @@ and numbering, any color, and boxes that wrap; highlight by dragging over words
 or drawing a box; a freehand marker and pen; shapes (line, arrow, rectangle,
 ellipse); an eraser that paints over just the part you drag across; a snapshot
 tool that copies any part of a page as an image or as text; stamps (EXHIBIT, FILED, CONFIDENTIAL or your
-own wording), check marks, signatures (draw or type), highlight, white-out, redact (the page is rasterized with the boxes burned in,
+own wording), check marks, signatures (draw or type), highlight, white-out, redact (the page is rasterized with the boxes burned in so nothing under them survives: the page's text, fonts, images, form fields, comments and links are dropped, as are the document's title and keyword metadata, embedded files and structure tree, and the saved file has no earlier revisions;
 fields and metadata on it removed, orphaned objects dropped), organize pages
-(reorder, rotate, delete, insert from another PDF, extract pages), combine
-several files by opening or dropping them together, Bates numbering, save a new
+(reorder, rotate, delete, insert from another PDF, extract pages), Bates numbering, save a new
 copy. Items you add stay editable when you reopen the saved copy here.
 
 E-signature: place signature, initials, date, text and checkbox fields for one

@@ -53,6 +53,7 @@ export function initSidebar() {
   $('#sideBtn').addEventListener('click', () => toggleSide());
   $('#tabPages').addEventListener('click', () => setTab('pages')); $('#tabOutline').addEventListener('click', () => setTab('outline'));
   on('doc:open', () => { if (!$('#side').hidden) { renderThumbs(); renderOutline(); } });
+  on('tab:switch', () => { if (!$('#side').hidden) { renderThumbs(); renderOutline(); } });
   on('doc:close', () => { $('#thumbs').innerHTML = ''; $('#outline').innerHTML = ''; });
   on('nav', n => markCurrentThumb(n));
   on('pages:changed', () => { if (!$('#side').hidden) renderThumbs(); });

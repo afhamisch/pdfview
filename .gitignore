@@ -7,3 +7,4 @@ app/public/fonts/
 server/data/
 .env
 app/public/pdfjs/
+app/undefined/

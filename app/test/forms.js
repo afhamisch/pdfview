@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PDFDocument, PDFTextField, PDFCheckBox, PDFRadioGroup, PDFDropdown } from 'pdf-lib';
 import * as pdfjs from 'pdfjs-dist/legacy/build/pdf.mjs';
-const [base, pdf, shots, label] = process.argv.slice(2);
+const [base, pdf, shotsArg, label] = process.argv.slice(2); const shots = shotsArg || mkdtempSync(join(tmpdir(), 'pdfview-shots-'));
 const dir = mkdtempSync(join(tmpdir(), 'pdfview-forms-'));
 async function textOf(bytes) { const task = pdfjs.getDocument({ data: new Uint8Array(bytes), isEvalSupported: false, verbosity: 0 }); const d = await task.promise; const out = []; for (let i = 1; i <= d.numPages; i++) { const p = await d.getPage(i); const t = await p.getTextContent(); out.push(t.items.map(x => x.str).join(' ')); } await task.destroy(); return out; }
 const browser = await chromium.launch(); const ctx = await browser.newContext({ viewport: { width: 1400, height: 1000 }, acceptDownloads: true }); const page = await ctx.newPage();
