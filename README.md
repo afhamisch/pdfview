@@ -62,6 +62,7 @@ cd app && node test/m1.js URL PDF    # viewer: search, navigation, thumbnails on
 cd app && node test/m2.js URL        # editor: fill, text, highlight, redact, Bates, organize, save, reopen
 cd app && node test/m3.js URL        # envelopes: compose, send, two signers, completed download
 cd app && node test/real.js URL PDF DIR  # full round trip on a real file (scan, rotated pages), screenshots to DIR
+cd app && node test/forms.js URL PDF DIR NAME  # fill a form-heavy PDF, save fillable and flattened, reopen
 ```
 
 The browser tests need Playwright with Chromium and a server (or a static

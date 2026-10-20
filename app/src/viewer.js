@@ -44,7 +44,7 @@ export function buildPages() {
     if (hooks.pageBar) bar.append(hooks.pageBar(p, n));
     const sheet = el('div', { class: 'sheet' }, el('canvas'), el('div', { class: 'textLayer' }), el('div', { class: 'annotationLayer' }), el('div', { class: 'layer ol' }));
     sec.append(bar, sheet);
-    Object.assign(p, { sec, sheet, canvas: sheet.querySelector('canvas'), tl: sheet.querySelector('.textLayer'), al: sheet.querySelector('.annotationLayer'), ol: sheet.querySelector('.ol'), key: '', tlKey: '', visible: false, textLayer: null, annLayer: null });
+    Object.assign(p, { sec, sheet, canvas: sheet.querySelector('canvas'), tl: sheet.querySelector('.textLayer'), al: sheet.querySelector('.annotationLayer'), ol: sheet.querySelector('.ol'), key: '', tlKey: '', visible: false, textLayer: null, annLayer: null, acm: new Map() });
     if (hooks.onSheetDown) sheet.addEventListener('pointerdown', e => hooks.onSheetDown(p, e));
     host.append(sec); io.observe(sec); ioFar.observe(sec);
   });
@@ -100,9 +100,10 @@ async function renderCanvas(p) {
   c.style.width = p.vp.width + 'px'; c.style.height = p.vp.height + 'px';
   const off = document.createElement('canvas');
   off.width = Math.floor(p.vp.width * dpr); off.height = Math.floor(p.vp.height * dpr);
-  const task = p.proxy.render({ canvasContext: off.getContext('2d'), viewport: p.vp, transform: dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : null, annotationMode: lib.AnnotationMode.ENABLE_FORMS });
+  // check boxes and radios get their own small canvases (checked and unchecked appearance) that the form layer shows; without the map they would both be painted onto the page
+  const task = p.proxy.render({ canvasContext: off.getContext('2d'), viewport: p.vp, transform: dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : null, annotationMode: lib.AnnotationMode.ENABLE_FORMS, annotationCanvasMap: p.acm });
   p.task = task; p.key = key;
-  try { await task.promise; if (p.task === task) { c.width = off.width; c.height = off.height; c.getContext('2d').drawImage(off, 0, 0); } }
+  try { await task.promise; if (p.task === task) { c.width = off.width; c.height = off.height; c.getContext('2d').drawImage(off, 0, 0); if (p.annLayer) { try { p.annLayer.update({ viewport: p.vp.clone({ dontFlip: true }) }); } catch (e) { console.warn(e); } } } }
   catch (e) { if (p.task === task) p.key = ''; }
   finally { if (p.task === task) p.task = null; off.width = off.height = 0; }
 }
@@ -121,7 +122,7 @@ async function renderAnnotations(p) {
     const annotations = await p.proxy.getAnnotations({ intent: 'display' });
     if (!annotations.length) return;
     const src = S.sources.get(p.src);
-    const layer = new lib.AnnotationLayer({ div: p.al, page: p.proxy, viewport: p.vp.clone({ dontFlip: true }), annotationStorage: src.doc.annotationStorage, linkService });
+    const layer = new lib.AnnotationLayer({ div: p.al, page: p.proxy, viewport: p.vp.clone({ dontFlip: true }), annotationStorage: src.doc.annotationStorage, annotationCanvasMap: p.acm, linkService });
     await layer.render({ annotations, renderForms: true, imageResourcesPath: '' });
     p.annLayer = layer;
     p.al.addEventListener('input', () => emit('form:change', p.src), { capture: true });
