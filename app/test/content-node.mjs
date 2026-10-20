@@ -34,6 +34,6 @@ run('BT /F1 12 Tf 14 TL 72 700 Td (one) Tj 2 0.5 (two) " (three) Tj ET', () => f
 { const bytes = enc('BT /F1 12 Tf 72 700 Td (Hello ) Tj (World) Tj ET'); const ops = walkText(bytes, () => fixed); const out = latin(removeOps(bytes, ops, new Set([0, 1])), 0, 1e6); check('whole line removed cleanly', !/Hello|World|TJ/.test(out), out); }
 // 8. tokenizer corner cases: nested parens, escapes, hex, names with #, negative numbers, inline images
 { const bytes = enc('q BI /W 2 /H 2 /CS /G /BPC 8 ID \x00\x01\x02\x03 EI Q BT /F#31 -12.5 Tf -72 -700.25 Td (a(b)c\\)d\\n) Tj <48656C6C6F> Tj ET'); const ops = walkText(bytes, () => fixed);
-  check('inline image skipped and strings parsed', ops.length === 2 && latin(ops[0].strings[0], 0, 99) === 'a(b)c)d\n' && latin(ops[1].strings[0], 0, 99) === 'Hello', JSON.stringify(ops.map(o => latin(o.strings[0], 0, 99))));
+  check('inline image skipped and strings parsed', ops.length === 2 && latin(ops[0].strings[0], 0, ops[0].strings[0].length) === 'a(b)c)d\n' && latin(ops[1].strings[0], 0, ops[1].strings[0].length) === 'Hello', JSON.stringify(ops.map(o => latin(o.strings[0], 0, o.strings[0].length))));
   check('negative operands keep their sign', near(ops[0].pos[0], -72) && near(ops[0].pos[1], -700.25) && ops[0].tfs === -12.5, ops[0].pos.join(',')); }
 console.log(fails ? `${fails} FAILED` : 'all passed'); process.exit(fails ? 1 : 0);
