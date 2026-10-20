@@ -1,6 +1,6 @@
 // Find in document: text is pulled per page through the worker and cached; hits are wrapped in the
 // text layer's spans so they highlight at any zoom.
-import { S, PG } from './state.js';
+import { S, PG, coveredWords } from './state.js';
 import { $, el, ICON } from './ui.js';
 import { goTo, scrollToPagePoint, requestRender } from './viewer.js';
 
@@ -10,7 +10,7 @@ export async function pageText(p) {
   const tc = await p.proxy.getTextContent({ includeMarkedContent: false });
   const items = tc.items.filter(i => i.str !== undefined);
   // recognized (OCR) words come after the page's own text, one item per word with a space after it
-  if (p.ocr) for (const wd of p.ocr.words) items.push({ str: wd.text + ' ', hasEOL: wd.eol, transform: [1, 0, 0, 1, wd.tl[0], wd.tl[1]], ocr: true });
+  if (p.ocr) { const hidden = coveredWords(p); p.ocr.words.forEach((wd, i) => items.push({ str: hidden.has(i) ? ' ' : wd.text + ' ', hasEOL: wd.eol, transform: [1, 0, 0, 1, wd.tl[0], wd.tl[1]], ocr: true })); }
   let s = ''; const offs = [];
   for (const it of items) { offs.push(s.length); s += it.str; if (it.hasEOL) s += '\n'; }
   p.text = { str: s, lower: s.toLowerCase(), items, offs };

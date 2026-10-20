@@ -6,12 +6,14 @@ import { el, ICON } from './ui.js';
 export const FONTS = { helv: { label: 'Helvetica', css: 'Helvetica, Arial, sans-serif' }, times: { label: 'Times', css: '"Times New Roman", Times, serif' }, courier: { label: 'Courier', css: '"Courier New", Courier, monospace' } };
 export const DEFAULT_STYLE = { font: 'helv', bold: false, italic: false, underline: false, align: 'left', list: 'none' };
 export const PAD = 2, LINE = 1.2;
+// Baseline of line i from the top of the box, in multiples of the size (matches the browser's line boxes).
+export const baselineAt = (o, i) => (o.lead || LINE) * i + 0.93 + ((o.lead || LINE) - LINE) / 2;
 export const listPrefix = (o, i) => o.list === 'bullet' ? '• ' : o.list === 'number' ? `${i + 1}. ` : '';
 
 // Apply an object's style to its on-screen element.
 export function applyStyle(t, o) {
   const f = FONTS[o.font] || FONTS.helv;
-  Object.assign(t.style, { fontFamily: f.css, fontWeight: o.bold ? '700' : '400', fontStyle: o.italic ? 'italic' : 'normal', textDecoration: o.underline ? 'underline' : 'none', textAlign: o.align || 'left' });
+  Object.assign(t.style, { fontFamily: f.css, fontWeight: o.bold ? '700' : '400', fontStyle: o.italic ? 'italic' : 'normal', textDecoration: o.underline ? 'underline' : 'none', textAlign: o.align || 'left', lineHeight: String(o.lead || LINE) });
   if (o.w) { t.style.width = '100%'; t.style.whiteSpace = 'pre-wrap'; t.style.overflowWrap = 'break-word'; }
   if (o.list && o.list !== 'none') { t.classList.add('list'); t.style.paddingLeft = (o.list === 'number' ? 1.7 : 1.1) * o.size * S.scale + PAD * S.scale + 'px'; t.style.textIndent = -(o.list === 'number' ? 1.7 : 1.1) * o.size * S.scale + 'px'; }
 }

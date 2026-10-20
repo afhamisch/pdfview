@@ -3,6 +3,7 @@ import { PDFDocument, PDFName, PDFArray, PDFRef, PDFHexString, decodePDFRawStrea
 import { pdfjs, docOptions } from './pdfjs.js';
 import { S, emit, nextPuid, nextUid } from './state.js';
 import { toast, plural } from './ui.js';
+import { requestRender } from './viewer.js';
 
 export const EDIT_KEY = 'EditLayer';
 export function hash(u8) { let h = 0x811c9dc5; for (let i = 0; i < u8.length; i++) { h ^= u8[i]; h = Math.imul(h, 0x01000193) >>> 0; } return h.toString(16) + ':' + u8.length; }
@@ -60,7 +61,7 @@ export async function openBytes(bytes, name, { sample = false, quiet = false } =
   if (!r.doc) { console.error(r.error); toast(r.needsPw ? 'This PDF is password protected. Remove the password, then open it here.' : 'That file could not be opened as a PDF.'); return false; }
   const { doc } = r;
   destroySources();
-  Object.assign(S, { doc, bytes, name, sample, pages: [], reg: new Map(), sources: new Map([[0, { id: 0, name, bytes, doc }]]), objects: [], sel: null, editing: null, undo: [], dirty: false, fit: 'width', org: false, osel: new Set(), anchor: null, bates: prep.bates || null, meta: {}, formDirty: new Set() });
+  Object.assign(S, { doc, bytes, name, sample, pages: [], reg: new Map(), sources: new Map([[0, { id: 0, name, bytes, doc }]]), objects: [], sel: null, editing: null, undo: [], dirty: false, fit: 'width', org: false, osel: new Set(), anchor: null, bates: prep.bates || null, meta: {}, formDirty: new Set(), lifts: [], lib: null, hover: null, lifting: false });
   const proxies = await Promise.all(Array.from({ length: doc.numPages }, (_, i) => doc.getPage(i + 1)));
   proxies.forEach((proxy, i) => S.pages.push(newPage(0, i, proxy))); mark('pages');
   S.objects = (prep.objects || []).filter(o => o.page >= 0 && o.page < doc.numPages).map(o => Object.assign({}, o, { id: nextUid(), page: S.pages[o.page].uid }));
@@ -78,7 +79,7 @@ export async function openBytes(bytes, name, { sample = false, quiet = false } =
 }
 export function closeDoc() {
   destroySources();
-  Object.assign(S, { doc: null, bytes: null, name: '', sample: false, pages: [], reg: new Map(), sources: new Map(), objects: [], sel: null, editing: null, undo: [], dirty: false, org: false, osel: new Set(), anchor: null, bates: null, meta: {}, formDirty: new Set() });
+  Object.assign(S, { doc: null, bytes: null, name: '', sample: false, pages: [], reg: new Map(), sources: new Map(), objects: [], sel: null, editing: null, undo: [], dirty: false, org: false, osel: new Set(), anchor: null, bates: null, meta: {}, formDirty: new Set(), lifts: [], lib: null, hover: null, lifting: false });
   emit('doc:close');
 }
 export async function readFile(file) {
@@ -94,4 +95,29 @@ export async function loadSource(file) {
   const r = await loadDoc(bytes);
   if (!r.doc) { toast(r.needsPw ? 'That PDF is password protected. Remove the password, then insert it.' : 'That file could not be opened as a PDF.'); return null; }
   return { id: S.sources.size ? Math.max(...S.sources.keys()) + 1 : 1, name: file.name, bytes, doc: r.doc };
+}
+
+/* The main document as pdf-lib sees it, kept around so text can be lifted off pages repeatedly
+   without re-parsing the file each time. Dropped whenever a different document is opened. */
+export async function libDoc() {
+  if (!S.lib) S.lib = await PDFDocument.load(S.sources.get(0).bytes, { ignoreEncryption: true, updateMetadata: false });
+  return S.lib;
+}
+/* Swap in new bytes for the main document (after a page's content changed) without losing the
+   page list, placed objects, typed form values or the scroll position. */
+export async function reloadMain(bytes) {
+  const r = await loadDoc(bytes); if (!r.doc) throw r.error || new Error('reload');
+  const src = S.sources.get(0), old = src.doc;
+  try { const { map } = old.annotationStorage.serializable; let n = 0; if (map) for (const [k, v] of map) { const c = Object.assign({}, v); if (typeof c.value === 'string' && c.formattedValue == null) c.formattedValue = c.value; r.doc.annotationStorage.setValue(k, c); n++; } } catch (e) { console.warn('form values', e); }
+  src.doc = r.doc; src.bytes = bytes; S.doc = r.doc; S.bytes = bytes;
+  for (const p of S.reg.values()) {
+    if (p.src !== 0) continue;
+    if (p.task) { try { p.task.cancel(); } catch {} p.task = null; }
+    p.proxy = await r.doc.getPage(p.si + 1);
+    p.key = ''; p.tlKey = ''; p.text = null; p.tkey = null; p.okey = null; p.edit = null; p.acm = new Map();
+    if (p.al) { p.al.innerHTML = ''; p.annLayer = null; }
+    if (p.sheet && p.visible) requestRender(p);
+  }
+  try { old.destroy(); } catch {}
+  emit('pages:changed');
 }

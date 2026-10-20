@@ -2,13 +2,13 @@
 // order and rotation, Bates numbers, redactions and the editable layer, and drops unreferenced objects.
 import { PDFDocument, PDFName, PDFDict, PDFArray, PDFRef, PDFStream, PDFHexString, PDFTextField, PDFCheckBox, StandardFonts, rgb, degrees, BlendMode, LineCapStyle } from 'pdf-lib';
 import { pdfjsLib as lib, docOptions } from './pdfjs.js';
-import { S, on } from './state.js';
+import { S, on, coveredWords } from './state.js';
 import { offset, rotOf } from './geometry.js';
 import { $, toast, plural } from './ui.js';
 import { EDIT_KEY, hash } from './document.js';
 import { batesBox } from './bates.js';
 import { markDirty } from './editor.js';
-import { layoutLines, boxWidth, PAD, LINE } from './textstyle.js';
+import { layoutLines, boxWidth, PAD, baselineAt } from './textstyle.js';
 import { embedCustom } from './fonts.js';
 import { keyHooks } from './hooks.js';
 
@@ -122,7 +122,9 @@ export async function buildPdf({ editLayer = true } = {}) {
     if (p.ocr && p.ocr.words.length) {
       // recognized text goes in as invisible text so the file is searchable elsewhere; it does not change the page's look
       page.getContentStream(false);
-      for (const wd of p.ocr.words) {
+      const hiddenWords = coveredWords(p);
+      for (const [wi, wd] of p.ocr.words.entries()) {
+        if (hiddenWords.has(wi)) continue; // edited away: the white-out covers it and the typed text replaces it
         const t = clean(wd.text, helv); if (!t.trim()) continue;
         const size = Math.max(2, Math.min(72, wd.h * 0.85)); const b = offset(wd.tl, p.ocr.rot, 0, wd.h * 0.8);
         page.drawText(t, { x: b[0], y: b[1], size, font: helv, color: rgb(0, 0, 0), opacity: 0, rotate: degrees(p.ocr.rot) });
@@ -169,7 +171,7 @@ export async function buildPdf({ editLayer = true } = {}) {
         const font = await fontFor(o), measure = str => font.widthOfTextAtSize(clean(str, font), o.size);
         const lines = layoutLines(Object.assign({}, o, { text: clean(o.text, font) }), measure), W = boxWidth(o, lines), col = hexRgb(o.color);
         lines.forEach((ln, i) => {
-          const base = PAD + o.size * (LINE * i + 0.93), ulY = base + o.size * 0.14, ulT = Math.max(.5, o.size * 0.06);
+          const base = PAD + o.size * baselineAt(o, i), ulY = base + o.size * 0.14, ulT = Math.max(.5, o.size * 0.06);
           let x = PAD; const avail = W - ln.indent;
           if (o.align === 'center') x += ln.indent + (avail - ln.width) / 2; else if (o.align === 'right') x += ln.indent + avail - ln.width; else x += ln.indent;
           if (ln.prefix) { const bp = offset([o.x, o.y], o.a, PAD, base); page.drawText(ln.prefix, { x: bp[0], y: bp[1], size: o.size, font, color: col, rotate: rot }); }
