@@ -1,0 +1,57 @@
+# PDFView roadmap
+
+PDFView is a PDF viewer and editor for a small litigation practice, with an
+envelope-based e-signature service, meant to replace Acrobat and a hosted
+signature product. It is built fresh under `app/` and `server/`.
+Jonathan's original single-file viewer (`pdf-desk.html`) stays in the repo
+unchanged; its proven ideas (rotation geometry, raster redaction, the
+editable layer that survives save and reopen) are ported with credit.
+
+## v0.1 (this release)
+
+Viewer
+- pdf.js 6.x in a real Web Worker, virtualized page rendering with a
+  bounded render queue and canvas release for long files
+- text layer: select and copy text
+- search (Ctrl+F) with per-page hit highlighting, next and previous
+- thumbnails sidebar, outline (bookmarks) panel, page readout with go-to
+- zoom that keeps your place (buttons, Ctrl+wheel, Ctrl plus/minus/0),
+  fit width, rotate
+- print by opening the saved PDF in the browser's own print path
+
+Editor
+- fill form fields, add text, check marks, signatures (draw or type),
+  highlight, white-out
+- redaction: the page is rasterized with the boxes burned in, fields,
+  annotations and document metadata on that page are removed, unreferenced
+  objects are dropped from the saved file
+- organize pages: reorder, rotate, delete, insert pages from another PDF
+- Bates numbering: prefix, start number, zero padding, corner, font size
+- save a new copy; added items stay editable when the copy is reopened here
+
+E-signature (server)
+- envelopes with one or more PDFs, ordered signers, placed fields
+  (signature, initials, date signed, text, checkbox)
+- tokenized per-signer links, signer page with explicit consent to
+  electronic records, draw or type signature
+- audit trail: created, sent, viewed, consented, signed, declined,
+  completed, each with time, IP and user agent
+- completion: fields stamped into the PDF with pdf-lib, certificate page
+  with envelope ID, signers, events, SHA-256 of original and final files
+- email through SMTP when configured; otherwise the dashboard shows the
+  signing link to copy
+- single-owner admin token; SQLite through node:sqlite; no native modules
+
+Offline build
+- `npm run build:offline` produces one HTML file (worker inlined) that
+  opens from disk with no server, viewer and editor only
+
+## Out of scope for v0.1
+
+- OCR, document compare, bookmark editing, form field creation
+- Windows installer: a Tauri wrapper is documented in `desktop/README.md`
+  and must be built on Windows or in CI
+- PKCS#7 digital signatures and trusted timestamps on completed envelopes
+- multi-user accounts, roles, SSO
+- any claim of legal compliance in the UI; the audit trail is evidence,
+  not a certification
