@@ -7,6 +7,8 @@ import { drawThumb } from './sidebar.js';
 import { pushUndo, markDirty } from './editor.js';
 import { newPage, loadSource } from './document.js';
 import { ctxHooks, keyHooks } from './hooks.js';
+import { buildPdf } from './save.js';
+import { PDFDocument } from 'pdf-lib';
 
 const TW = 150, TH = 194, DIS = '#tools .tb,#zoomIn,#zoomOut,#zoomFit,#pgIn,#pgPrev,#pgNext,#batesBtn,#findBtn,#sendBtn,#printBtn';
 let orgIO = null;
@@ -127,6 +129,21 @@ export function deletePages(uids) {
   markDirty(); renderOrg(); emit('ctx'); toast(`Deleted ${plural(k, 'page')}. Use Undo to bring ${k > 1 ? 'them' : 'it'} back.`);
 }
 export function rotatePages(uids, deg) { const set = new Set(uids); if (!set.size) return; pushUndo(); S.pages.forEach(p => { if (set.has(p.uid)) p.rot = (p.rot + deg) % 360; }); markDirty(); renderOrg(); }
+// Save the selected pages (with everything placed on them) as a new PDF.
+async function extractPages(uids) {
+  const idx = S.pages.map((p, i) => uids.has(p.uid) ? i : -1).filter(i => i >= 0); if (!idx.length) return;
+  try {
+    const { bytes } = await buildPdf({ editLayer: false });
+    const src = await PDFDocument.load(bytes, { ignoreEncryption: true, updateMetadata: false }), out = await PDFDocument.create();
+    try { const f = src.getForm(); if (f.getFields().length) f.flatten(); } catch {}
+    const pages = await out.copyPages(src, idx); pages.forEach(pg => out.addPage(pg));
+    const data = await out.save({ useObjectStreams: false });
+    const name = (S.name.replace(/\.pdf$/i, '') || 'document') + '-pages-' + toRanges(idx).replace(/,\s*/g, '_') + '.pdf';
+    if (typeof window.pdfviewSaveHook === 'function') await window.pdfviewSaveHook({ filename: name, bytes: data });
+    else { const a = el('a', { href: URL.createObjectURL(new Blob([data], { type: 'application/pdf' })), download: name }); document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); }
+    toast(`Saved ${plural(idx.length, 'page')} as ${name}.`);
+  } catch (e) { console.error(e); toast('Those pages could not be extracted.'); }
+}
 function defaultPos() { if (!S.osel.size) return S.pages.length; let last = -1; S.pages.forEach((p, i) => { if (S.osel.has(p.uid)) last = i; }); return last + 1; }
 function mk(label, fn, o = {}) {
   const b = el('button', { type: 'button', class: 'mini' + (o.cls ? ' ' + o.cls : ''), title: o.title, 'aria-label': o.aria, disabled: !!o.disabled });
@@ -140,7 +157,8 @@ function renderOrgCtx(c) {
   const sep = () => c.append(el('span', { class: 'sep' })); sep();
   c.append(mk('', () => rotatePages(sel, 270), { icon: ICON.rl, aria: 'Rotate selected pages left', title: 'Rotate selected left', disabled: !k }));
   c.append(mk('', () => rotatePages(sel, 90), { icon: ICON.rr, aria: 'Rotate selected pages right', title: 'Rotate selected right', disabled: !k }));
-  c.append(mk(k > 1 ? `Delete ${k} pages` : 'Delete', () => deletePages(sel), { cls: 'danger', disabled: !k })); sep();
+  c.append(mk(k > 1 ? `Delete ${k} pages` : 'Delete', () => deletePages(sel), { cls: 'danger', disabled: !k }));
+  c.append(mk(k > 1 ? `Extract ${k} pages…` : 'Extract page…', () => extractPages(new Set(sel)), { disabled: !k, title: 'Save the selected pages as a new PDF', cls: 'extract' })); sep();
   const inp = el('input', { type: 'number', class: 'ctl', id: 'orgMoveTo', min: 1, max: n, disabled: !k, style: { width: '64px' } });
   if (k) { let first = -1; S.pages.forEach((p, i) => { if (first < 0 && S.osel.has(p.uid)) first = i; }); inp.value = first + 1; }
   inp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); moveSelTo(+inp.value); } });

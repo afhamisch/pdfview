@@ -71,7 +71,8 @@ server for `dist`) at URL.
 ## Windows default viewer
 
 See `desktop/README.md`. A Tauri wrapper registers the `.pdf` file association
-and opens files in this app; it has to be built on Windows or in CI.
+and opens files in this app. The `Desktop (Windows installer)` workflow under
+Actions builds it and uploads the installer as an artifact.
 
 ## Limits of this release
 

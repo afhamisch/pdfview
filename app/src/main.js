@@ -11,6 +11,7 @@ import { initSearch, openFind, applyHighlights } from './search.js';
 import { initSidebar, toggleSide } from './sidebar.js';
 import { makeSample } from './sample.js';
 import { ctxHooks, keyHooks } from './hooks.js';
+import { initDesktop } from './desktop.js';
 
 /* theme: 'system' (default), 'light' or 'dark'; Jonathan's palette follows the OS unless overridden */
 const THEME_KEY = 'pdfview.theme', THEMES = ['system', 'light', 'dark'];
@@ -94,6 +95,7 @@ initViewer(); initSearch(); initSidebar();
 const mods = await Promise.all([import('./editor.js'), import('./organize.js'), import('./bates.js'), import('./save.js'), import('./sign/index.js')].map(p => p.catch(e => { console.warn('module', e); return null; })));
 for (const m of mods) if (m && m.init) m.init();
 await pdfjs();
+initDesktop();
 if (location.pathname.startsWith('/sign/') && mods[4]) mods[4].startSigner(location.pathname.slice(6));
 else showRest();
 // Hooks for a desktop wrapper (see desktop/README.md): open a file handed over by the OS.

@@ -1,47 +1,52 @@
 # Desktop wrapper (Windows default PDF viewer)
 
 A web page cannot be a Windows default handler for `.pdf`; only an installed
-application can. The smallest wrapper is Tauri: it ships a tiny executable that
-uses the WebView2 runtime already on Windows 10 and 11 (Chromium), so the
-viewer behaves exactly as it does in Edge.
+application can. This folder is a Tauri 2 wrapper: a small executable that
+hosts the offline build of the app in the WebView2 runtime already on
+Windows 10 and 11 (Chromium, so the viewer behaves as it does in Edge), and
+registers the `.pdf` file association when installed.
 
-This folder documents the setup; the wrapper has to be built on a Windows
-machine (or a Windows runner in CI), since the Linux build environment this
-project was prepared in cannot produce a Windows installer.
+## Getting the installer
 
-## Setup
+The GitHub Actions workflow `.github/workflows/desktop.yml` builds the
+installer on a Windows runner on every push to `main` that touches the app or
+the wrapper, and on demand from the Actions tab (Run workflow). Download the
+`PDFView-windows` artifact; it holds `PDFView_x.y.z_x64-setup.exe` (NSIS,
+installs for the current user, no admin rights) and an `.msi`.
 
-1. Install Rust (rustup) and the Tauri prerequisites for Windows (WebView2 is
-   preinstalled on current Windows; the installer bundles it otherwise).
-2. From the repository root:
-   ```
-   npm run build:offline
-   npx @tauri-apps/cli init --app-name PDFView --window-title PDFView --frontend-dist ../app/dist-offline --dev-url http://localhost:5173
-   ```
-3. In `src-tauri/tauri.conf.json` add the file association so the installer
-   registers PDFView for `.pdf` and Windows lists it under Default apps:
-   ```json
-   "bundle": {
-     "fileAssociations": [
-       { "ext": ["pdf"], "name": "PDF document", "description": "PDF document", "mimeType": "application/pdf", "role": "Editor" }
-     ]
-   }
-   ```
-4. Hand the opened file to the page. In `src-tauri/src/main.rs`, read the
-   path from the launch arguments (`std::env::args().nth(1)`) and from the
-   single-instance plugin for "Open with" while running, read the bytes, and
-   call into the page:
-   ```rust
-   window.eval(&format!("window.pdfviewOpen({}, {:?})", serde_json::to_string(&bytes)?, name))?;
-   ```
-   The app exposes `window.pdfviewOpen(bytesArray, name)` for this purpose
-   (see `app/src/main.js`).
-5. Build the installer: `npx @tauri-apps/cli build`. Install it, then pick
-   PDFView under Settings, Apps, Default apps, `.pdf`.
+After installing, Windows lists PDFView under Settings, Apps, Default apps,
+`.pdf`. Double-clicking a PDF, or "Open with", opens it in PDFView; a second
+file while the app is running opens in the same window.
 
-## Saving
+## Building locally (Windows)
 
-In the browser build, Save downloads a copy. The wrapper can offer a native
-Save dialog by exposing a `save` command from Rust and calling
-`window.pdfviewSaveHook = async ({ filename, bytes }) => ...` before the page
-loads; when that hook is present the app calls it instead of downloading.
+1. Install Rust (rustup) and Node 22. WebView2 is preinstalled on current
+   Windows; the installer bundles a bootstrapper otherwise.
+2. From the repository root: `npm install`, `npm run build:offline`.
+3. `cd desktop`, `npx tauri icon icon.png` (generates `src-tauri/icons`), then
+   `npx tauri build`. The installer lands in `src-tauri/target/release/bundle`.
+
+`npx tauri dev` runs the wrapper against the offline build for a quick check.
+
+## How the page and the wrapper talk
+
+`app/src/desktop.js` runs only when the page is inside the wrapper
+(`window.__TAURI__` exists):
+
+- on start it asks the wrapper for files passed on the command line
+  (`pending_files`), reads them (`read_file`) and opens the first one;
+- `open-files` events arrive when another PDF is double-clicked while the app
+  is running (single-instance plugin);
+- Save calls `save_file` with the PDF bytes as a binary IPC body and the
+  suggested name in a header; the wrapper shows a native Save dialog and
+  writes the file.
+
+The Rust side is `src-tauri/src/lib.rs`; permissions are in
+`src-tauri/capabilities/default.json`.
+
+## Not covered
+
+Envelopes need the server; the wrapper is the viewer and editor only. The
+Linux build environment this project was prepared in has no GTK or WebKit
+development packages, so the wrapper was syntax-checked here and compiled
+by the Windows workflow, not locally.

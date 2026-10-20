@@ -3,12 +3,17 @@
   "private": true,
   "version": "0.1.0",
   "description": "PDFView: offline PDF viewer and editor with an envelope-based e-signature service",
-  "workspaces": ["app", "server"],
+  "workspaces": [
+    "app",
+    "server",
+    "desktop"
+  ],
   "scripts": {
     "dev": "npm --workspace app run dev",
     "build": "npm --workspace app run build",
     "build:offline": "npm --workspace app run build:offline",
     "start": "npm --workspace server start",
-    "test": "npm --workspace server test && npm --workspace app test"
+    "test": "npm --workspace server test && npm --workspace app test",
+    "desktop:build": "npm --workspace desktop run build"
   }
 }
