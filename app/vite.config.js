@@ -1,9 +1,9 @@
 import { defineConfig } from 'vite';
 import { viteSingleFile } from 'vite-plugin-singlefile';
 
-const offline = !!process.env.OFFLINE;
-
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+  const offline = mode === 'offline' || !!process.env.OFFLINE;
+  return {
   define: { __OFFLINE__: JSON.stringify(offline) },
   plugins: offline ? [viteSingleFile({ removeViteModuleLoader: true })] : [],
   build: {
@@ -12,4 +12,5 @@ export default defineConfig({
     chunkSizeWarningLimit: 4000
   },
   server: { port: 5173, proxy: { '/api': 'http://localhost:8787' } }
+  };
 });
