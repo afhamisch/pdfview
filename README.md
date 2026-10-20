@@ -41,10 +41,11 @@ away (a 500-page file or a 150 MB scan stays responsive), text selection, find
 with highlighting, thumbnails and bookmarks, page readout with go-to, zoom that
 keeps your place, rotate, print through the browser's own PDF viewer.
 
-Editor: fill form fields, add text, check marks, signatures (draw or type),
-highlight, white-out, redact (the page is rasterized with the boxes burned in,
+Editor: fill form fields, add text, stamps (EXHIBIT, FILED, CONFIDENTIAL or your
+own wording), check marks, signatures (draw or type), highlight, white-out, redact (the page is rasterized with the boxes burned in,
 fields and metadata on it removed, orphaned objects dropped), organize pages
-(reorder, rotate, delete, insert from another PDF), Bates numbering, save a new
+(reorder, rotate, delete, insert from another PDF, extract pages), combine
+several files by opening or dropping them together, Bates numbering, save a new
 copy. Items you add stay editable when you reopen the saved copy here.
 
 E-signature: place signature, initials, date, text and checkbox fields for one

@@ -55,7 +55,7 @@ on('doc:close', () => { $('#findbar').hidden = true; });
 /* ---------- context strip ---------- */
 const HINT = {
   select: 'Select text to copy it, or click a field to fill it in. Click an added item to select it, drag to move it.',
-  text: 'Click on the page where the text should start.', check: 'Click on the page to place a check mark.', sign: 'Click on the page to place your signature.',
+  text: 'Click on the page where the text should start.', stamp: 'Pick a stamp, then click on the page to place it. Double-click a placed stamp to change its wording.', check: 'Click on the page to place a check mark.', sign: 'Click on the page to place your signature.',
   highlight: 'Drag across the passage to highlight it.', whiteout: 'Drag a white box over anything you want to cover.',
   redact: 'Drag a black box over anything you want to redact. When you save, everything under the boxes is permanently removed from the file.',
   field: 'Click on the page to place the field for the selected signer.'
@@ -70,14 +70,20 @@ on('ctx', () => {
 /* ---------- wiring ---------- */
 $('#openBtn').addEventListener('click', () => $('#fileIn').click());
 $('#closeBtn').addEventListener('click', requestClose);
-$('#fileIn').addEventListener('change', e => { readFile(e.target.files[0]); e.target.value = ''; });
+$('#fileIn').addEventListener('change', async e => {
+  const files = [...e.target.files]; e.target.value = '';
+  if (!files.length) return;
+  // several files: the first opens, the others are appended as pages (combine)
+  if (await readFile(files[0]) && files.length > 1) emit('files:append', files.slice(1));
+});
 $('#findBtn').addEventListener('click', openFind);
 let dragN = 0;
 addEventListener('dragenter', e => { if ([...(e.dataTransfer?.types || [])].includes('Files')) { dragN++; $('#dropHint').textContent = S.org ? 'Drop the PDF to insert its pages' : 'Drop the PDF to open it'; $('#dropHint').hidden = false; } });
 addEventListener('dragleave', () => { dragN = Math.max(0, dragN - 1); if (!dragN) $('#dropHint').hidden = true; });
 addEventListener('dragover', e => e.preventDefault());
-addEventListener('drop', e => { e.preventDefault(); dragN = 0; $('#dropHint').hidden = true; const f = e.dataTransfer?.files?.[0]; if (!f || anyModalOpen()) return; emit('drop', f); });
+addEventListener('drop', e => { e.preventDefault(); dragN = 0; $('#dropHint').hidden = true; const fs = [...(e.dataTransfer?.files || [])]; if (!fs.length || anyModalOpen()) return; if (fs.length > 1 && !S.org) emit('drop:many', fs); else emit('drop', fs[0]); });
 on('drop', f => { if (!S.org) readFile(f); });
+on('drop:many', async files => { if (S.org || !files.length) return; if (await readFile(files[0]) && files.length > 1) emit('files:append', files.slice(1)); });
 addEventListener('beforeunload', e => { if (S.dirty && !S.sample) { e.preventDefault(); e.returnValue = ''; } });
 
 addEventListener('keydown', e => {

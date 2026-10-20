@@ -6,7 +6,7 @@ export const SHELL = `
   <header class="top">
     <div class="brand">${ICON.open.replace('<svg', '<svg width="18" height="18"')}<span>PDFView</span></div>
     <button class="btn" id="openBtn" type="button">${ICON.open}Open</button>
-    <input type="file" id="fileIn" accept="application/pdf,.pdf" hidden><input type="file" id="insFile" accept="application/pdf,.pdf" hidden>
+    <input type="file" id="fileIn" accept="application/pdf,.pdf" multiple hidden><input type="file" id="insFile" accept="application/pdf,.pdf" hidden>
     <div class="file" id="fileName"><b>No file</b></div>
     <button class="ib" id="closeBtn" type="button" title="Close PDF" aria-label="Close PDF" hidden>${ICON.close}</button>
     <div class="grp">
@@ -28,7 +28,7 @@ export const SHELL = `
     </div>
     <div class="spacer"></div>
     <div class="grp" role="toolbar" aria-label="Tools" id="tools">
-      ${tool('select', 'Select', 'V')}${tool('text', 'Text', 'T')}${tool('check', 'Check', 'K')}${tool('sign', 'Sign', 'S')}${tool('highlight', 'Highlight', 'H')}${tool('whiteout', 'White-out', 'W')}${tool('redact', 'Redact', 'R')}
+      ${tool('select', 'Select', 'V')}${tool('text', 'Text', 'T')}${tool('stamp', 'Stamp', 'M')}${tool('check', 'Check', 'K')}${tool('sign', 'Sign', 'S')}${tool('highlight', 'Highlight', 'H')}${tool('whiteout', 'White-out', 'W')}${tool('redact', 'Redact', 'R')}
     </div>
     <div class="grp">
       <button class="tb" id="undoBtn" title="Undo (Ctrl+Z)" disabled>${ICON.undo}<span class="t">Undo</span></button>

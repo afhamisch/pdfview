@@ -6,7 +6,7 @@ export const S = {
   pages: [], reg: new Map(),
   scale: 1, fit: 'width', // 'width' | 'page' | null
   tool: 'select', objects: [], sel: null, editing: null, undo: [], dirty: false,
-  sig: null, tsize: 11, tcolor: '#111111',
+  sig: null, tsize: 11, tcolor: '#111111', stamp: '',
   org: false, osel: new Set(), anchor: null, orgReturn: null,
   bates: null,           // { prefix, start, pad, corner, size } or null
   meta: {}               // misc: outline, title

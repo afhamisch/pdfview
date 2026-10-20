@@ -47,11 +47,12 @@ select.ctl,input.ctl{height:28px;border:1px solid var(--line);border-radius:6px;
 .layer{position:absolute;inset:0;pointer-events:none}.layer>*{position:absolute;pointer-events:auto;transform-origin:0 0}
 body:not([data-tool="select"]) .textLayer,body:not([data-tool="select"]) .annotationLayer{pointer-events:none}
 body:not([data-tool="select"]) .textLayer span{pointer-events:none}
-body[data-tool="text"] .sheet{cursor:text}body[data-tool="check"] .sheet,body[data-tool="sign"] .sheet,body[data-tool="field"] .sheet{cursor:copy}
+body[data-tool="text"] .sheet{cursor:text}body[data-tool="stamp"] .sheet{cursor:copy}body[data-tool="check"] .sheet,body[data-tool="sign"] .sheet,body[data-tool="field"] .sheet{cursor:copy}
 body[data-tool="highlight"] .sheet,body[data-tool="whiteout"] .sheet,body[data-tool="redact"] .sheet{cursor:crosshair;touch-action:none}
 .textLayer .hit{background:rgba(255,200,0,.55);color:transparent;border-radius:2px}.textLayer .hit.cur{background:rgba(255,120,0,.7)}
 .obj{box-sizing:border-box}.obj.sel{outline:1.5px solid var(--acc);outline-offset:1px}
 .obj-text{cursor:move;min-width:12px;min-height:12px}.obj-text .txt{white-space:pre-wrap;font-family:Helvetica,Arial,sans-serif;line-height:1.2;outline:0;min-width:1ch}
+.obj-text.boxed .txt{border:1.5px solid currentColor;font-weight:600;letter-spacing:.04em;border-radius:2px;line-height:1.15}
 .obj-text .txt[contenteditable="true"],.obj-text .txt[contenteditable="plaintext-only"]{cursor:text;background:rgba(31,95,191,.06)}
 .obj-image{cursor:move}.obj-image img{display:block;width:100%;height:100%;pointer-events:none}
 .obj-check{cursor:move}.obj-check svg{display:block;width:100%;height:100%}
