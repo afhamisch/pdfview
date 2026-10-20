@@ -1,4 +1,5 @@
 import 'pdfjs-dist/web/pdf_viewer.css';
+import './fonts.css';
 import './styles.css';
 import { S, on, emit } from './state.js';
 import { $, $$, el, toast, anyModalOpen } from './ui.js';
@@ -11,8 +12,18 @@ import { initSidebar, toggleSide } from './sidebar.js';
 import { makeSample } from './sample.js';
 import { ctxHooks, keyHooks } from './hooks.js';
 
+/* theme: 'system' (default), 'light' or 'dark'; Jonathan's palette follows the OS unless overridden */
+const THEME_KEY = 'pdfview.theme', THEMES = ['system', 'light', 'dark'];
+function applyTheme(t) {
+  if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme;
+  const b = document.getElementById('themeBtn'); if (b) b.title = t === 'system' ? 'Theme: follows your system. Click for light.' : t === 'light' ? 'Theme: light. Click for dark.' : 'Theme: dark. Click to follow your system.';
+}
+let theme = 'system'; try { theme = THEMES.includes(localStorage.getItem(THEME_KEY)) ? localStorage.getItem(THEME_KEY) : 'system'; } catch {}
+applyTheme(theme);
 document.getElementById('app').innerHTML = SHELL;
 document.body.dataset.tool = 'select';
+applyTheme(theme);
+$('#themeBtn').addEventListener('click', () => { theme = THEMES[(THEMES.indexOf(theme) + 1) % THEMES.length]; try { localStorage.setItem(THEME_KEY, theme); } catch {} applyTheme(theme); });
 
 function setFileLabel() {
   const f = $('#fileName'); f.innerHTML = '';

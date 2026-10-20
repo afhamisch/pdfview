@@ -50,7 +50,8 @@ export const ICON = {
   cb: svg('<path d="M4 12.5l5 5L20 6"/>', 'stroke-width="3.2"'),
   field: svg('<rect x="3" y="7" width="18" height="10" rx="2"/><path d="M7 12h4"/>'),
   link: svg('<path d="M10 14a3.5 3.5 0 0 0 5 0l3-3a3.5 3.5 0 0 0-5-5l-1 1"/><path d="M14 10a3.5 3.5 0 0 0-5 0l-3 3a3.5 3.5 0 0 0 5 5l1-1"/>'),
-  back: svg('<path d="M15 6l-6 6 6 6"/>')
+  back: svg('<path d="M15 6l-6 6 6 6"/>'),
+  theme: svg('<circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor" stroke="none"/>')
 };
 export function btn(label, { icon, cls = 'tb', title, onclick, id, data, disabled } = {}) {
   const b = el('button', { type: 'button', class: cls, title: title || label, id, disabled });
