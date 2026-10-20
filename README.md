@@ -49,7 +49,9 @@ saved copy as invisible text so Acrobat, Edge and e-filing portals can search
 it too. Available in the served app and the desktop wrapper (the engine files
 are about 15 MB and are not inlined into the single offline file).
 
-Editor: fill form fields, add text, stamps (EXHIBIT, FILED, CONFIDENTIAL or your
+Editor: fill form fields, add text with fonts (Helvetica, Times, Courier), bold,
+italic, underline, alignment including justified, bullets and numbering, any
+color, and boxes that wrap; stamps (EXHIBIT, FILED, CONFIDENTIAL or your
 own wording), check marks, signatures (draw or type), highlight, white-out, redact (the page is rasterized with the boxes burned in,
 fields and metadata on it removed, orphaned objects dropped), organize pages
 (reorder, rotate, delete, insert from another PDF, extract pages), combine
