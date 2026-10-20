@@ -2,7 +2,7 @@
 
 A web page cannot be a Windows default handler for `.pdf`; only an installed
 application can. This folder is a Tauri 2 wrapper: a small executable that
-hosts the offline build of the app in the WebView2 runtime already on
+hosts the desktop build of the app (`app/dist-desktop`, served through Tauri's asset protocol so OCR and scan decoders load) in the WebView2 runtime already on
 Windows 10 and 11 (Chromium, so the viewer behaves as it does in Edge), and
 registers the `.pdf` file association when installed.
 
@@ -22,11 +22,11 @@ file while the app is running opens in the same window.
 
 1. Install Rust (rustup) and Node 22. WebView2 is preinstalled on current
    Windows; the installer bundles a bootstrapper otherwise.
-2. From the repository root: `npm install`, `npm run build:offline`.
+2. From the repository root: `npm install`, `npm run build:desktop`.
 3. `cd desktop`, `npx tauri icon icon.png` (generates `src-tauri/icons`), then
    `npx tauri build`. The installer lands in `src-tauri/target/release/bundle`.
 
-`npx tauri dev` runs the wrapper against the offline build for a quick check.
+`npx tauri dev` runs the wrapper against the desktop build for a quick check.
 
 ## How the page and the wrapper talk
 

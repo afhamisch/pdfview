@@ -6,7 +6,7 @@ import { $, el, ICON } from './ui.js';
 
 let io = null, ioFar = null;
 const RQ = { q: new Set(), active: 0, MAX: 2, t: 0, lastT: 0, lastY: 0, v: 0 };
-const hooks = { pageBar: null, onSheetDown: null, afterLayoutPage: null, afterTextLayer: null };
+const hooks = { pageBar: null, onSheetDown: null, afterLayoutPage: null, afterTextLayer: null, ocrLayer: null };
 export function setHooks(h) { Object.assign(hooks, h); }
 export const scroller = () => $('#scroller');
 
@@ -42,9 +42,9 @@ export function buildPages() {
     const bar = el('div', { class: 'pg-bar' }, el('span', { class: 'pg-lbl', html: `Page ${n} <span class="of">of ${N}</span>` }));
     if (p.src) bar.firstChild.append(el('span', { class: 'of src-note', text: ` from ${S.sources.get(p.src).name}, p.${p.si + 1}` }));
     if (hooks.pageBar) bar.append(hooks.pageBar(p, n));
-    const sheet = el('div', { class: 'sheet' }, el('canvas'), el('div', { class: 'textLayer' }), el('div', { class: 'annotationLayer' }), el('div', { class: 'layer ol' }));
+    const sheet = el('div', { class: 'sheet' }, el('canvas'), el('div', { class: 'textLayer' }), el('div', { class: 'ocrLayer' }), el('div', { class: 'annotationLayer' }), el('div', { class: 'layer ol' }));
     sec.append(bar, sheet);
-    Object.assign(p, { sec, sheet, canvas: sheet.querySelector('canvas'), tl: sheet.querySelector('.textLayer'), al: sheet.querySelector('.annotationLayer'), ol: sheet.querySelector('.ol'), key: '', tlKey: '', visible: false, textLayer: null, annLayer: null, acm: new Map() });
+    Object.assign(p, { sec, sheet, canvas: sheet.querySelector('canvas'), tl: sheet.querySelector('.textLayer'), ocrl: sheet.querySelector('.ocrLayer'), al: sheet.querySelector('.annotationLayer'), ol: sheet.querySelector('.ol'), key: '', tlKey: '', visible: false, textLayer: null, annLayer: null, acm: new Map() });
     if (hooks.onSheetDown) sheet.addEventListener('pointerdown', e => hooks.onSheetDown(p, e));
     host.append(sec); io.observe(sec); ioFar.observe(sec);
   });
@@ -70,6 +70,7 @@ export function layoutPage(p) {
   p.sheet.style.setProperty('--scale-factor', String(S.scale));
   if (p.annLayer) { try { p.annLayer.update({ viewport: p.vp.clone({ dontFlip: true }) }); } catch (e) { console.warn(e); } }
   if (hooks.afterLayoutPage) hooks.afterLayoutPage(p);
+  if (hooks.ocrLayer) hooks.ocrLayer(p);
   if (p.visible) requestRender(p);
 }
 

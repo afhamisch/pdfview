@@ -9,6 +9,8 @@ export async function pageText(p) {
   if (p.text) return p.text;
   const tc = await p.proxy.getTextContent({ includeMarkedContent: false });
   const items = tc.items.filter(i => i.str !== undefined);
+  // recognized (OCR) words come after the page's own text, one item per word with a space after it
+  if (p.ocr) for (const wd of p.ocr.words) items.push({ str: wd.text + ' ', hasEOL: wd.eol, transform: [1, 0, 0, 1, wd.tl[0], wd.tl[1]], ocr: true });
   let s = ''; const offs = [];
   for (const it of items) { offs.push(s.length); s += it.str; if (it.hasEOL) s += '\n'; }
   p.text = { str: s, lower: s.toLowerCase(), items, offs };
@@ -21,8 +23,8 @@ function findIn(p, q) {
 }
 function itemAt(p, pos) { const { offs } = p.text; let lo = 0, hi = offs.length - 1; while (lo < hi) { const m = (lo + hi + 1) >> 1; if (offs[m] <= pos) lo = m; else hi = m - 1; } return lo; }
 export function applyHighlights(p) {
-  if (!p.textLayer || !p.text) return;
-  const divs = p.textLayer.textDivs; if (!divs) return;
+  if (!p.text) return;
+  const divs = [...(p.textLayer?.textDivs || []), ...(p.ocrDivs || [])]; if (!divs.length) return;
   const hits = F.hits.filter(h => h.page === p); if (!hits.length) return;
   const perItem = new Map();
   for (const h of hits) {
@@ -43,7 +45,7 @@ export function applyHighlights(p) {
   }
 }
 function clearHighlights() {
-  for (const p of S.pages) { if (!p.textLayer) continue; const divs = p.textLayer.textDivs || []; divs.forEach((d, i) => { if (d.querySelector('.hit')) { const br = d.querySelector('br'); d.textContent = p.text.items[i].str; if (br) d.append(br); } }); }
+  for (const p of S.pages) clearHighlightsOn(p);
 }
 export async function runSearch(q) {
   F.query = q; const run = ++F.running; clearHighlights(); F.hits = []; F.cur = -1; F.busy = !!q; status();
@@ -55,7 +57,7 @@ export async function runSearch(q) {
   }
   F.busy = false;
   if (F.hits.length) { F.cur = 0; focusHit(); }
-  S.pages.forEach(p => { if (p.textLayer) applyHighlights(p); });
+  S.pages.forEach(p => applyHighlights(p));
   status();
 }
 function status() { const c = $('#findCount'); if (!c) return; c.textContent = !F.query ? '' : F.hits.length ? `${F.cur < 0 ? '' : (F.cur + 1) + ' of '}${F.hits.length}${F.busy ? '…' : ''}` : F.busy ? 'Searching…' : 'No matches'; }
@@ -63,11 +65,11 @@ function focusHit() {
   const h = F.hits[F.cur]; if (!h) return; const p = h.page; const n = S.pages.indexOf(p) + 1;
   const it = p.text.items[itemAt(p, h.start)];
   if (it && it.transform) scrollToPagePoint(p, it.transform[4], it.transform[5]); else goTo(n);
-  S.pages.forEach(x => { if (x.textLayer) { const divs = x.textLayer.textDivs || []; if (divs.some(d => d.querySelector('.hit'))) { clearHighlightsOn(x); applyHighlights(x); } } });
-  if (p.textLayer) { clearHighlightsOn(p); applyHighlights(p); }
+  S.pages.forEach(x => { if (x !== p) { const divs = [...(x.textLayer?.textDivs || []), ...(x.ocrDivs || [])]; if (divs.some(d => d.querySelector('.hit'))) { clearHighlightsOn(x); applyHighlights(x); } } });
+  clearHighlightsOn(p); applyHighlights(p);
   status();
 }
-function clearHighlightsOn(p) { const divs = p.textLayer.textDivs || []; divs.forEach((d, i) => { if (d.querySelector('.hit')) { const br = d.querySelector('br'); d.textContent = p.text.items[i].str; if (br) d.append(br); } }); }
+function clearHighlightsOn(p) { if (!p.text) return; const divs = [...(p.textLayer?.textDivs || []), ...(p.ocrDivs || [])]; divs.forEach((d, i) => { if (d.querySelector('.hit')) { const it = p.text.items[i]; const br = d.querySelector('br'); d.textContent = it ? it.str : ''; if (br) d.append(br); } }); }
 export function nextHit(dir = 1) { if (!F.hits.length) return; F.cur = (F.cur + dir + F.hits.length) % F.hits.length; focusHit(); }
 export function openFind() { const b = $('#findbar'); b.hidden = false; F.open = true; const i = $('#findIn'); i.focus(); i.select(); }
 export function closeFind() { $('#findbar').hidden = true; F.open = false; F.query = ''; clearHighlights(); F.hits = []; F.cur = -1; status(); }

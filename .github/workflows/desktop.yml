@@ -20,7 +20,7 @@ jobs:
         with:
           workspaces: desktop/src-tauri
       - run: npm ci
-      - run: npm run build:offline
+      - run: npm run build:desktop
       - run: npx tauri icon icon.png
         working-directory: desktop
       - run: npx tauri build

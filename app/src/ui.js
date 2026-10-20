@@ -35,6 +35,7 @@ export const ICON = {
   undo: svg('<path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/>'),
   select: svg('<path d="M5 3l14 7-6 2-2 6z"/>'),
   text: svg('<path d="M5 7V5h14v2M12 5v14M9 19h6"/>'),
+  ocr: svg('<path d="M4 8V5h3M20 8V5h-3M4 16v3h3M20 16v3h-3"/><path d="M8 12h8M12 9v6"/>'),
   stamp: svg('<rect x="3.5" y="6.5" width="17" height="11" rx="1.5"/><path d="M7 12h10"/>'),
   check: svg('<path d="M4 12.5l5 5L20 6"/>', 'stroke-width="2.2"'),
   sign: svg('<path d="M3 20h18"/><path d="M6 16l9.5-9.5 3 3L9 19H6z"/>'),

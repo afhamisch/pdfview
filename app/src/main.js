@@ -32,7 +32,7 @@ function setFileLabel() {
   if (S.sample) f.append(el('span', { class: 'tag', text: 'Sample' }));
 }
 export function setEnabled(onOff) {
-  $$('#tools .tb,#zoomIn,#zoomOut,#zoomFit,#pgIn,#pgPrev,#pgNext,#saveBtn,#orgBtn,#batesBtn,#printBtn,#sendBtn,#findBtn').forEach(b => b.disabled = !onOff);
+  $$('#tools .tb,#zoomIn,#zoomOut,#zoomFit,#pgIn,#pgPrev,#pgNext,#saveBtn,#orgBtn,#batesBtn,#ocrBtn,#printBtn,#sendBtn,#findBtn').forEach(b => b.disabled = !onOff);
   $('#undoBtn').disabled = !onOff || !S.undo.length;
   $('#closeBtn').hidden = !onOff;
   if (!onOff) { $('#zoomPct').textContent = '100%'; $('#pgIn').value = ''; $('#pgOf').textContent = 'of 0'; }
@@ -97,8 +97,9 @@ addEventListener('keydown', e => {
 });
 
 setHooks({ afterTextLayer: p => applyHighlights(p) });
+import('./ocr.js').then(m => setHooks({ ocrLayer: m.renderOcrLayer }));
 initViewer(); initSearch(); initSidebar();
-const mods = await Promise.all([import('./editor.js'), import('./organize.js'), import('./bates.js'), import('./save.js'), import('./sign/index.js')].map(p => p.catch(e => { console.warn('module', e); return null; })));
+const mods = await Promise.all([import('./editor.js'), import('./organize.js'), import('./bates.js'), import('./save.js'), import('./sign/index.js'), import('./ocr.js')].map(p => p.catch(e => { console.warn('module', e); return null; })));
 for (const m of mods) if (m && m.init) m.init();
 await pdfjs();
 initDesktop();

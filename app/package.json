@@ -9,7 +9,8 @@
     "build:offline": "node scripts/copy-pdfjs-assets.mjs && vite build --mode offline --outDir dist-offline",
     "test": "echo \"Browser tests: node test/m1.js URL PDF, node test/m2.js URL, node test/m3.js URL (see README)\"",
     "predev": "node scripts/copy-pdfjs-assets.mjs",
-    "prebuild": "node scripts/copy-pdfjs-assets.mjs"
+    "prebuild": "node scripts/copy-pdfjs-assets.mjs",
+    "build:desktop": "node scripts/copy-pdfjs-assets.mjs && vite build --mode desktop --outDir dist-desktop"
   },
   "dependencies": {
     "pdf-lib": "^1.17.1",
