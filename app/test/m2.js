@@ -43,7 +43,9 @@ writeFileSync(join(dir, 'reopen.pdf'), saved.bytes); await page.setInputFiles('#
 out.reopen = { objects: await page.$$eval('.obj:not(.obj-bates)', e => e.length), bates: await page.$$eval('.obj-bates', e => e.map(x => x.textContent)), toast: await page.textContent('#toast') };
 // undo + organize: open organize, move page 2 to position 1, done, save, check order
 await page.click('#orgBtn'); await page.waitForSelector('#orgGrid .oth'); await page.click('#orgGrid .oth >> nth=1'); await page.fill('#orgMoveTo', '1'); await page.press('#orgMoveTo', 'Enter'); await page.waitForTimeout(200);
-out.orgOrder = await page.$$eval('#orgGrid .oth .src', e => e.map(x => x.textContent)); await page.keyboard.press('Escape'); await page.waitForTimeout(400);
+out.orgOrder = await page.$$eval('#orgGrid .oth .src', e => e.map(x => x.textContent));
+const ex = await dl(() => page.click('#ctx .mini.extract')); out.extract = { name: ex.name, pages: (await PDFDocument.load(ex.bytes)).getPageCount() };
+await page.keyboard.press('Escape'); await page.waitForTimeout(400);
 out.pgAfterOrg = await page.$$eval('.pg .src-note, .pg-lbl', e => e.length);
 const saved2 = await dl(() => page.click('#saveBtn')); const d2 = await PDFDocument.load(saved2.bytes); out.saved2Pages = d2.getPageCount();
 const t2 = await textOf(saved2.bytes); out.firstPageNowTerms = /Terms of engagement/.test(t2[0]) || t2[0].length < 40;

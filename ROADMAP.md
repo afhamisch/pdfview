@@ -25,7 +25,8 @@ Editor
 - redaction: the page is rasterized with the boxes burned in, fields,
   annotations and document metadata on that page are removed, unreferenced
   objects are dropped from the saved file
-- organize pages: reorder, rotate, delete, insert pages from another PDF
+- organize pages: reorder, rotate, delete, insert pages from another PDF,
+  extract selected pages to a new file
 - Bates numbering: prefix, start number, zero padding, corner, font size
 - save a new copy; added items stay editable when the copy is reopened here
 
@@ -49,8 +50,8 @@ Offline build
 ## Out of scope for v0.1
 
 - OCR, document compare, bookmark editing, form field creation
-- Windows installer: a Tauri wrapper is documented in `desktop/README.md`
-  and must be built on Windows or in CI
+- Windows installer built locally: the Tauri wrapper in `desktop/` is built
+  by the GitHub Actions workflow on a Windows runner
 - PKCS#7 digital signatures and trusted timestamps on completed envelopes
 - multi-user accounts, roles, SSO
 - any claim of legal compliance in the UI; the audit trail is evidence,
