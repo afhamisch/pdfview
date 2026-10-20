@@ -8,6 +8,7 @@ import { $, toast, plural } from './ui.js';
 import { EDIT_KEY, hash } from './document.js';
 import { batesBox } from './bates.js';
 import { markDirty } from './editor.js';
+import { layoutLines, boxWidth, PAD, LINE } from './textstyle.js';
 import { keyHooks } from './hooks.js';
 
 const PN = k => PDFName.of(k);
@@ -77,6 +78,9 @@ async function sourceBytes(src) {
 export async function buildPdf({ editLayer = true } = {}) {
   const doc = await PDFDocument.load(await sourceBytes(S.sources.get(0)), { ignoreEncryption: true, updateMetadata: false });
   const helv = await doc.embedFont(StandardFonts.Helvetica), helvB = await doc.embedFont(StandardFonts.HelveticaBold);
+  const fontCache = new Map([['helv', helv], ['helv:b', helvB]]);
+  const STD = { helv: ['Helvetica', 'HelveticaBold', 'HelveticaOblique', 'HelveticaBoldOblique'], times: ['TimesRoman', 'TimesRomanBold', 'TimesRomanItalic', 'TimesRomanBoldItalic'], courier: ['Courier', 'CourierBold', 'CourierOblique', 'CourierBoldOblique'] };
+  const fontFor = async o => { const fam = STD[o.font] ? o.font : 'helv', key = fam + (o.bold ? ':b' : '') + (o.italic ? ':i' : ''); if (!fontCache.has(key)) fontCache.set(key, await doc.embedFont(StandardFonts[STD[fam][(o.bold ? 1 : 0) + (o.italic ? 2 : 0)]])); return fontCache.get(key); };
   const flatten = $('#flatten').checked;
   const keptMain = new Set(S.pages.filter(p => p.src === 0).map(p => p.si));
   let form = null; try { form = doc.getForm(); } catch {}
@@ -135,7 +139,25 @@ export async function buildPdf({ editLayer = true } = {}) {
         page.drawRectangle({ x: corner[0], y: corner[1], width: bw, height: bh, rotate: rot, borderColor: hexRgb(o.color), borderWidth: 1.5 });
         lines.forEach((line, i) => { if (!line) return; const b = offset([o.x, o.y], o.a, padX, padY + lh * i + o.size * 0.93); page.drawText(line, { x: b[0], y: b[1], size: o.size, font, color: hexRgb(o.color), rotate: rot }); });
       }
-      else if (o.type === 'text') clean(o.text, helv).split('\n').forEach((line, i) => { if (!line) return; const b = offset([o.x, o.y], o.a, 2, 2 + o.size * (1.2 * i + 0.93)); page.drawText(line, { x: b[0], y: b[1], size: o.size, font: helv, color: hexRgb(o.color), rotate: rot }); });
+      else if (o.type === 'text') {
+        const font = await fontFor(o), measure = str => font.widthOfTextAtSize(clean(str, font), o.size);
+        const lines = layoutLines(Object.assign({}, o, { text: clean(o.text, font) }), measure), W = boxWidth(o, lines), col = hexRgb(o.color);
+        lines.forEach((ln, i) => {
+          const base = PAD + o.size * (LINE * i + 0.93), ulY = base + o.size * 0.14, ulT = Math.max(.5, o.size * 0.06);
+          let x = PAD; const avail = W - ln.indent;
+          if (o.align === 'center') x += ln.indent + (avail - ln.width) / 2; else if (o.align === 'right') x += ln.indent + avail - ln.width; else x += ln.indent;
+          if (ln.prefix) { const bp = offset([o.x, o.y], o.a, PAD, base); page.drawText(ln.prefix, { x: bp[0], y: bp[1], size: o.size, font, color: col, rotate: rot }); }
+          if (!ln.text) return;
+          if (ln.justify) {
+            const gap = (avail - ln.words.reduce((a, w) => a + measure(w), 0)) / (ln.words.length - 1); let cx = PAD + ln.indent;
+            for (const w of ln.words) { const b = offset([o.x, o.y], o.a, cx, base); page.drawText(w, { x: b[0], y: b[1], size: o.size, font, color: col, rotate: rot }); cx += measure(w) + gap; }
+            if (o.underline) { const u0 = offset([o.x, o.y], o.a, PAD + ln.indent, ulY), u1 = offset([o.x, o.y], o.a, PAD + ln.indent + avail, ulY); page.drawLine({ start: { x: u0[0], y: u0[1] }, end: { x: u1[0], y: u1[1] }, thickness: ulT, color: col }); }
+          } else {
+            const b = offset([o.x, o.y], o.a, x, base); page.drawText(ln.text, { x: b[0], y: b[1], size: o.size, font, color: col, rotate: rot });
+            if (o.underline) { const u0 = offset([o.x, o.y], o.a, x, ulY), u1 = offset([o.x, o.y], o.a, x + ln.width, ulY); page.drawLine({ start: { x: u0[0], y: u0[1] }, end: { x: u1[0], y: u1[1] }, thickness: ulT, color: col }); }
+          }
+        });
+      }
       if (!isRed) { const c = Object.assign({}, o, { page: idx }); delete c.id; kept.push(c); }
     }
     if (bx) { const b = offset([bx.x, bx.y], bx.a, 0, bx.size * 0.8); page.drawText(bx.label, { x: b[0], y: b[1], size: bx.size, font: helv, color: rgb(0, 0, 0), rotate: degrees(bx.a) }); }

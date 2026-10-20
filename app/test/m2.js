@@ -16,7 +16,12 @@ await page.fill('.annotationLayer input[type=text]', 'Alan F. Hamisch'); await p
 // add text
 await page.evaluate(() => document.querySelector('#scroller').scrollTop = 0); await page.waitForTimeout(200);
 await page.click('[data-tool="text"]'); const sheet = await page.$('.sheet'); const b = await sheet.boundingBox();
-await page.mouse.click(b.x + 400, b.y + 560); await page.waitForSelector('.obj-text .txt[contenteditable]'); await page.keyboard.type('Added by PDFView'); await page.keyboard.press('Escape');
+await page.mouse.click(b.x + 400, b.y + 560); await page.waitForSelector('.obj-text .txt[contenteditable]'); await page.keyboard.type('Added by PDFView'); await page.keyboard.press('Enter'); await page.keyboard.type('Second point here'); await page.keyboard.press('Escape');
+// format it: Times, bold, bullets, then widen the box by dragging the corner handle
+await page.click('.obj-text'); await page.selectOption('#ctx select[aria-label="Font"]', 'times'); await page.click('#ctx button[title^="Bold"]'); await page.selectOption('#ctx select[aria-label="List"]', 'bullet');
+{ const h = await page.$('.obj-text .hdl'); const hb = await h.boundingBox(); await page.mouse.move(hb.x + 6, hb.y + 6); await page.mouse.down(); await page.mouse.move(hb.x + 160, hb.y + 6, { steps: 5 }); await page.mouse.up(); }
+await page.keyboard.press('Escape'); await page.waitForTimeout(200);
+out.textStyle = await page.$eval('.obj-text .txt', e => ({ font: getComputedStyle(e).fontFamily.slice(0, 15), weight: getComputedStyle(e).fontWeight, list: e.classList.contains('list'), text: e.textContent.slice(0, 20), width: e.closest('.obj').style.width }));
 // stamp
 await page.click('[data-tool="stamp"]'); await page.selectOption('#stampPick', 'CONFIDENTIAL'); await page.mouse.click(b.x + 700, b.y + 150); await page.waitForTimeout(200);
 // check mark
@@ -40,7 +45,7 @@ const saved = await dl(() => page.click('#redGo'));
 out.saved = { name: saved.name, size: saved.bytes.length };
 const doc = await PDFDocument.load(saved.bytes); out.savedPages = doc.getPageCount(); out.rot = doc.getPage(0).getRotation().angle;
 out.fieldValue = doc.getForm().getTextField('full_name').getText(); out.hasEditLayer = saved.bytes.includes('/EditLayer');
-const texts = await textOf(saved.bytes); out.p1HasAdded = /Added by PDFView/.test(texts[0]); out.p1HasStamp = /CONFIDENTIAL/.test(texts[0]); out.p1Bates = /HAM-00100/.test(texts[0]); out.p2TextAfterRedact = texts[1].trim().length;
+const texts = await textOf(saved.bytes); out.p1HasAdded = /Added by PDFView/.test(texts[0]); out.p1HasStamp = /CONFIDENTIAL/.test(texts[0]); out.p1Bullets = /\u2022/.test(texts[0]); out.timesBold = saved.bytes.includes('Times-Bold'); out.p1Bates = /HAM-00100/.test(texts[0]); out.p2TextAfterRedact = texts[1].trim().length;
 // reopen the saved file: objects and bates come back
 writeFileSync(join(dir, 'reopen.pdf'), saved.bytes); await page.setInputFiles('#fileIn', join(dir, 'reopen.pdf')); await page.waitForTimeout(1500);
 out.reopen = { objects: await page.$$eval('.obj:not(.obj-bates)', e => e.length), bates: await page.$$eval('.obj-bates', e => e.map(x => x.textContent)), toast: await page.textContent('#toast') };

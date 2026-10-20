@@ -5,6 +5,7 @@ import { frame, offset, rotOf, toWorld, place, rectFrom } from './geometry.js';
 import { $, $$, el, toast, ICON, anyModalOpen } from './ui.js';
 import { setHooks, layout, buildPages, rotatePage, scroller } from './viewer.js';
 import { openSig } from './signature.js';
+import { applyStyle, displayText, textToolbar } from './textstyle.js';
 import { initSignature } from './signature.js';
 import { ctxHooks, keyHooks } from './hooks.js';
 
@@ -37,14 +38,15 @@ export function renderAllObjs() { S.pages.forEach(renderObjs); }
 function objEl(p, o) {
   const d = el('div', { class: 'obj obj-' + o.type + (S.sel === o.id ? ' sel' : '') + (o.type === 'field' ? ' sc' + ((o.signer % 5) + 1) : ''), dataset: { id: o.id } });
   if (o.type === 'text') {
-    const t = el('div', { class: 'txt', text: o.text, style: { fontSize: o.size * S.scale + 'px', color: o.color, padding: 2 * S.scale + 'px' } });
+    const t = el('div', { class: 'txt', text: displayText(o), style: { fontSize: o.size * S.scale + 'px', color: o.color, padding: 2 * S.scale + 'px' } });
+    if (!o.box) applyStyle(t, o);
     if (o.box) { d.classList.add('boxed'); t.style.borderWidth = Math.max(1, 1.5 * S.scale) + 'px'; t.style.borderColor = o.color; t.style.padding = `${3 * S.scale}px ${6 * S.scale}px`; }
     d.append(t); d.addEventListener('dblclick', () => startEdit(o));
   } else if (o.type === 'image') d.append(el('img', { src: o.src, alt: 'Signature', draggable: 'false' }));
   else if (o.type === 'check') d.innerHTML = `<svg viewBox="0 0 100 100" preserveAspectRatio="none"><polyline points="12,55 40,82 90,18" fill="none" stroke="${o.color}" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
   else if (o.type === 'field') d.append(el('span', { class: 'fl', text: fieldLabel(o) }));
   place(d, p, o);
-  if (S.sel === o.id && o.type !== 'text') { const h = el('div', { class: 'hdl', title: 'Drag to resize' }); h.addEventListener('pointerdown', e => resizeDown(p, o, d, e)); d.append(h); }
+  if (S.sel === o.id && !o.box) { const h = el('div', { class: 'hdl', title: o.type === 'text' ? 'Drag to set the box width (text wraps inside it)' : 'Drag to resize' }); h.addEventListener('pointerdown', e => resizeDown(p, o, d, e)); d.append(h); }
   d.addEventListener('pointerdown', e => objDown(p, o, e));
   return d;
 }
@@ -76,6 +78,7 @@ function resizeDown(p, o, d, e) {
   const mv = ev => {
     const P = toWorld(p, ev), { c, s } = frame(o.a), dx = P[0] - o.x, dy = P[1] - o.y;
     const u = dx * c + dy * s, v = dx * s - dy * c;
+    if (o.type === 'text') { o.w = Math.max(24, u); const cur0 = findEl(p, o); if (cur0) { place(cur0, p, o); applyStyle(cur0.querySelector('.txt'), o); } return; }
     o.w = Math.max(6, u);
     o.h = (o.type === 'image' || o.type === 'check') ? o.w * o.ar : Math.max(3, v);
     const cur = findEl(p, o); if (cur) place(cur, p, o);
@@ -87,17 +90,21 @@ export function startEdit(o) {
   const p = PG(o.page); if (!p || !p.ol) return;
   if (S.sel !== o.id) select(o.id);
   const d = findEl(p, o); if (!d) return; const t = d.querySelector('.txt');
-  S.editing = o.id;
+  S.editing = o.id; if (!o.box) { t.textContent = o.text; t.classList.remove('list'); t.style.paddingLeft = ''; t.style.textIndent = ''; }
   try { t.contentEditable = 'plaintext-only'; } catch { t.contentEditable = 'true'; }
   if (t.contentEditable !== 'plaintext-only') t.contentEditable = 'true';
   let pushed = false;
   t.addEventListener('input', () => { if (!pushed) { pushUndo(); pushed = true; } o.text = t.innerText.replace(/\n$/, ''); markDirty(); });
-  t.addEventListener('keydown', ev => { if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); t.blur(); } });
+  t.addEventListener('keydown', ev => {
+    if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); t.blur(); return; }
+    const k = (ev.ctrlKey || ev.metaKey) && !o.box ? { b: 'bold', i: 'italic', u: 'underline' }[ev.key.toLowerCase()] : null;
+    if (k) { ev.preventDefault(); if (!pushed) { pushUndo(); pushed = true; } o[k] = !o[k]; applyStyle(t, o); markDirty(); emit('ctx'); }
+  });
   t.addEventListener('paste', ev => { ev.preventDefault(); document.execCommand('insertText', false, (ev.clipboardData || window.clipboardData).getData('text/plain')); });
   t.addEventListener('blur', () => {
     t.contentEditable = 'false'; S.editing = null; o.text = t.innerText.replace(/\n$/, '');
-    if (!o.text.trim()) { S.objects = S.objects.filter(x => x !== o); if (S.sel === o.id) S.sel = null; renderObjs(p); }
-    emit('ctx');
+    if (!o.text.trim()) { S.objects = S.objects.filter(x => x !== o); if (S.sel === o.id) S.sel = null; }
+    renderObjs(p); emit('ctx');
   }, { once: true });
   t.focus();
   const r = document.createRange(); r.selectNodeContents(t); r.collapse(false); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
@@ -118,7 +125,7 @@ function sheetDown(p, e) {
   e.preventDefault();
   if (tool === 'text') {
     pushUndo(); const tl = offset(P, R, -2, -(S.tsize * 0.75 + 2));
-    const o = addObj(p, { type: 'text', x: tl[0], y: tl[1], a: R, text: '', size: S.tsize, color: S.tcolor });
+    const o = addObj(p, Object.assign({ type: 'text', x: tl[0], y: tl[1], a: R, text: '', size: S.tsize, color: S.tcolor }, S.textStyle));
     setTool('select'); setTimeout(() => startEdit(o), 0);
   } else if (tool === 'stamp') {
     pushUndo(); const text = S.stamp || STAMPS[0], size = 14; const tl = offset(P, R, -(text.length * size * 0.33), -(size * 0.9));
@@ -202,18 +209,27 @@ function renderCtx(c) {
       c.append(sel, custom, el('span', { text: 'then click on the page to place it.' })); return true;
     }
     if (S.tool === 'highlight' || S.tool === 'whiteout' || S.tool === 'redact') { c.append(el('span', { text: `Drag a box on the page, or select text and press ${S.tool === 'highlight' ? 'H' : S.tool === 'whiteout' ? 'W' : 'R'} again to mark the selection.` })); return true; }
+    if (S.tool === 'text') {
+      c.append(el('span', { class: 'lbl', text: 'Text' }));
+      const target = Object.assign({ size: S.tsize, color: S.tcolor }, S.textStyle);
+      textToolbar(c, target, { isDefault: true, onChange: mut => { mut(target); S.tsize = target.size; S.tcolor = target.color; const { size, color, ...rest } = target; S.textStyle = rest; emit('ctx'); } });
+      return true;
+    }
     return false;
   }
   c.append(el('span', { class: 'lbl', text: { text: o.box ? 'Stamp' : 'Text', check: 'Check mark', image: 'Signature', highlight: 'Highlight', whiteout: 'White-out', redact: 'Redaction', field: 'Signature field' }[o.type] }));
   if (o.type === 'redact') c.append(el('span', { text: 'Content under this box is permanently removed when you save.', style: { color: 'var(--redline)' } }));
-  if (o.type === 'text') {
+  if (o.type === 'text' && !o.box) {
+    textToolbar(c, o, { onChange: mut => { pushUndo(); mut(o); S.tsize = o.size; S.tcolor = o.color; const { font, bold, italic, underline, align, list } = o; S.textStyle = { font, bold, italic, underline, align, list }; const wasEditing = S.editing === o.id; renderObjs(PG(o.page)); markDirty(); emit('ctx'); if (wasEditing) startEdit(o); } });
+    if (S.editing !== o.id) c.append(el('button', { class: 'mini', type: 'button', text: 'Edit text', onclick: () => startEdit(o) }));
+  } else if (o.type === 'text') {
     const sz = el('select', { class: 'ctl', 'aria-label': 'Text size' });
     [8, 9, 10, 11, 12, 14, 16, 18, 24, 32].forEach(n => sz.append(el('option', { value: n, text: n + ' pt' })));
-    sz.value = o.size; sz.addEventListener('change', () => { pushUndo(); o.size = +sz.value; S.tsize = o.size; renderObjs(PG(o.page)); markDirty(); }); c.append(sz);
+    sz.value = o.size; sz.addEventListener('change', () => { pushUndo(); o.size = +sz.value; renderObjs(PG(o.page)); markDirty(); }); c.append(sz);
   }
-  if (o.type === 'text' || o.type === 'check') {
+  if ((o.type === 'text' && o.box) || o.type === 'check') {
     COLORS.forEach(([hex, name]) => { const b = el('button', { class: 'sw', type: 'button', title: name, 'aria-label': name, 'aria-pressed': String(o.color === hex), style: { background: hex } }); b.addEventListener('pointerdown', e => e.preventDefault()); b.addEventListener('click', () => { pushUndo(); o.color = hex; S.tcolor = hex; renderObjs(PG(o.page)); markDirty(); emit('ctx'); }); c.append(b); });
-    if (o.type === 'text' && S.editing !== o.id) c.append(el('button', { class: 'mini', type: 'button', text: 'Edit text', onclick: () => startEdit(o) }));
+    if (o.type === 'text' && S.editing !== o.id) c.append(el('button', { class: 'mini', type: 'button', text: 'Edit wording', onclick: () => startEdit(o) }));
   }
   if (o.type === 'image') c.append(el('button', { class: 'mini', type: 'button', text: 'Change signature', onclick: () => openSig().then(s => { if (!s) return; pushUndo(); S.sig = s; o.src = s.url; o.ar = s.ar; o.h = o.w * o.ar; renderObjs(PG(o.page)); markDirty(); }) }));
   if (o.type === 'field') emit('ctx:field', { c, o });
