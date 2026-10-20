@@ -26,7 +26,10 @@ Envelopes panel or send a document. See `server/README.md` for the environment
 variables (port, data directory, SMTP for email, base URL for signing links).
 
 Offline, no server: `npm run build:offline` produces `app/dist-offline/index.html`,
-a single file that opens from disk with the viewer and editor only (no envelopes).
+a single file (about 5 MB) that opens from disk with the viewer and editor only (no
+envelopes). The build copies pdf.js's run-time resources (JBIG2 and JPX decoders for
+scanned PDFs, standard fonts, CMaps) into `app/public/pdfjs` for the served app and
+inlines the decoders and fonts into the offline file.
 
 Development: `npm run dev` runs Vite on port 5173 and proxies `/api` and `/sign`
 to a server started with `npm start`.
@@ -58,6 +61,7 @@ npm --workspace server test          # API and signing flow (node:test)
 cd app && node test/m1.js URL PDF    # viewer: search, navigation, thumbnails on a large file
 cd app && node test/m2.js URL        # editor: fill, text, highlight, redact, Bates, organize, save, reopen
 cd app && node test/m3.js URL        # envelopes: compose, send, two signers, completed download
+cd app && node test/real.js URL PDF DIR  # full round trip on a real file (scan, rotated pages), screenshots to DIR
 ```
 
 The browser tests need Playwright with Chromium and a server (or a static

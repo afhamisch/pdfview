@@ -3,3 +3,4 @@ app/dist/
 app/dist-offline/
 server/data/
 .env
+app/public/pdfjs/

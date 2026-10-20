@@ -1,7 +1,7 @@
 // Saving: form values come out of pdf.js (saveDocument), then pdf-lib applies added objects, page
 // order and rotation, Bates numbers, redactions and the editable layer, and drops unreferenced objects.
 import { PDFDocument, PDFName, PDFDict, PDFArray, PDFRef, PDFStream, PDFHexString, PDFTextField, PDFCheckBox, StandardFonts, rgb, degrees, BlendMode, LineCapStyle } from 'pdf-lib';
-import { pdfjsLib as lib } from './pdfjs.js';
+import { pdfjsLib as lib, docOptions } from './pdfjs.js';
 import { S, on } from './state.js';
 import { offset, rotOf } from './geometry.js';
 import { $, toast, plural } from './ui.js';
@@ -31,7 +31,7 @@ const PAGE_EXTRAS = ['Annots', 'Thumb', 'PieceInfo', 'Metadata', 'StructParents'
 function emptyPageNode(doc, node) { node.set(PN('Contents'), doc.context.obj([])); node.set(PN('Resources'), doc.context.obj({})); PAGE_EXTRAS.forEach(k => node.delete(PN(k))); }
 async function applyRedactions(doc, idxs, rectsAt) {
   const bytes1 = await doc.save({ updateFieldAppearances: false });
-  const d1 = await lib.getDocument({ data: bytes1.slice(), isEvalSupported: false }).promise;
+  const d1 = await lib.getDocument(docOptions({ data: bytes1.slice() })).promise;
   const shots = [];
   try { for (const idx of idxs) { const pp = await d1.getPage(idx + 1); shots.push({ idx, view: pp.view.slice(), jpg: await rasterize(pp, rectsAt.get(idx) || []) }); } }
   finally { try { d1.destroy(); } catch {} }

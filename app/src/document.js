@@ -1,6 +1,6 @@
 // Opening and closing documents, page records, and the editable layer that survives save and reopen.
 import { PDFDocument, PDFName, PDFArray, PDFRef, PDFHexString, decodePDFRawStream } from 'pdf-lib';
-import { pdfjs } from './pdfjs.js';
+import { pdfjs, docOptions } from './pdfjs.js';
 import { S, emit, nextPuid, nextUid } from './state.js';
 import { toast, plural } from './ui.js';
 
@@ -47,7 +47,7 @@ export function destroySources() { S.sources.forEach(s => { try { s.doc.destroy(
 
 export async function loadDoc(bytes) {
   const lib = await pdfjs();
-  const task = lib.getDocument({ data: bytes.slice(), isEvalSupported: false, cMapUrl: undefined });
+  const task = lib.getDocument(docOptions({ data: bytes.slice() }));
   let needsPw = false; task.onPassword = () => { needsPw = true; task.destroy(); };
   try { return { doc: await task.promise }; } catch (e) { return { error: e, needsPw: needsPw || e?.name === 'PasswordException' }; }
 }
