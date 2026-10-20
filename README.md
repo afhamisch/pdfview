@@ -25,7 +25,9 @@ firm; each message carries a reply-to of whoever sent the envelope). The server
 prints an admin token on first start and writes it to
 `server/data/admin-token.txt`. The app asks for it the first time you open the
 Envelopes panel or send a document. See `server/README.md` for the environment
-variables (port, data directory, SMTP for email, base URL for signing links).
+variables (port, data directory, SMTP for email, base URL for signing links)
+and `docs/DEPLOYMENT.md` for hosting the site on a server with HTTPS and
+keeping it updated.
 
 Offline, no server: `npm run build:offline` produces `app/dist-offline/index.html`,
 a single file (about 5 MB) that opens from disk with the viewer and editor only (no
@@ -98,7 +100,8 @@ server for `dist`) at URL.
 
 See `desktop/README.md`. A Tauri wrapper registers the `.pdf` file association
 and opens files in this app. The `Desktop (Windows installer)` workflow under
-Actions builds it and uploads the installer as an artifact.
+Actions builds it and uploads the installer as an artifact. `docs/DEPLOYMENT.md`
+describes the planned auto-update (signed releases the app installs itself).
 
 ## Limits of this release
 
