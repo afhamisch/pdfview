@@ -2,7 +2,7 @@
 // order and rotation, Bates numbers, redactions and the editable layer, and drops unreferenced objects.
 import { PDFDocument, PDFName, PDFDict, PDFArray, PDFRef, PDFStream, PDFHexString, PDFTextField, PDFCheckBox, StandardFonts, rgb, degrees, BlendMode, LineCapStyle } from 'pdf-lib';
 import { pdfjsLib as lib, docOptions } from './pdfjs.js';
-import { S, on } from './state.js';
+import { S, on, coveredWords } from './state.js';
 import { offset, rotOf } from './geometry.js';
 import { $, toast, plural } from './ui.js';
 import { EDIT_KEY, hash } from './document.js';
@@ -122,7 +122,9 @@ export async function buildPdf({ editLayer = true } = {}) {
     if (p.ocr && p.ocr.words.length) {
       // recognized text goes in as invisible text so the file is searchable elsewhere; it does not change the page's look
       page.getContentStream(false);
-      for (const wd of p.ocr.words) {
+      const hiddenWords = coveredWords(p);
+      for (const [wi, wd] of p.ocr.words.entries()) {
+        if (hiddenWords.has(wi)) continue; // edited away: the white-out covers it and the typed text replaces it
         const t = clean(wd.text, helv); if (!t.trim()) continue;
         const size = Math.max(2, Math.min(72, wd.h * 0.85)); const b = offset(wd.tl, p.ocr.rot, 0, wd.h * 0.8);
         page.drawText(t, { x: b[0], y: b[1], size, font: helv, color: rgb(0, 0, 0), opacity: 0, rotate: degrees(p.ocr.rot) });

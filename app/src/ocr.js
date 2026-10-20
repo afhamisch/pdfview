@@ -3,7 +3,7 @@
 // viewers can search the file too. Needs the served or desktop build (the engine files live in /ocr).
 import { createWorker } from 'tesseract.js';
 import { pdfjsLib as lib } from './pdfjs.js';
-import { S, on, emit } from './state.js';
+import { S, on, emit, coveredWords } from './state.js';
 import { rotOf, place } from './geometry.js';
 import { applyHighlights, findState } from './search.js';
 import { $, el, toast, plural } from './ui.js';
@@ -51,18 +51,19 @@ export function renderOcrLayer(p) {
   if (!p.ocrl) return;
   p.ocrl.innerHTML = ''; p.ocrDivs = [];
   if (!p.ocr || !p.vp) return;
-  const frag = document.createDocumentFragment();
-  for (const wd of p.ocr.words) {
+  const frag = document.createDocumentFragment(), hidden = coveredWords(p);
+  p.ocr.words.forEach((wd, i) => {
     const hpx = wd.h * S.scale;
-    const span = el('span', { class: 'ocr', text: wd.text + ' ', style: { fontSize: hpx * 0.85 + 'px', lineHeight: hpx + 'px' } });
+    const span = el('span', { class: 'ocr', text: hidden.has(i) ? '' : wd.text + ' ', style: { fontSize: hpx * 0.85 + 'px', lineHeight: hpx + 'px' } });
     place(span, p, { x: wd.tl[0], y: wd.tl[1], h: wd.h, a: p.ocr.rot }); // no width: measured below
     frag.append(span); p.ocrDivs.push(span);
-  }
+  });
   p.ocrl.append(frag);
   // stretch each span so the transparent text (and the selection drawn on it) covers the printed word exactly, as pdf.js does
   for (let i = 0; i < p.ocrDivs.length; i++) { const span = p.ocrDivs[i], want = p.ocr.words[i].w * S.scale, have = span.offsetWidth; if (have > 0 && Math.abs(have - want) > 0.5) span.style.transform = (span.style.transform ? span.style.transform + ' ' : '') + `scaleX(${want / have})`; }
   if (findState.hits.length) applyHighlights(p);
 }
+on('ocr:refresh', p => { if (p && p.ocr) { p.text = null; renderOcrLayer(p); } });
 function needsOcr(p) { return !p.ocr; }
 async function runOcr(pages) {
   if (running) return; running = true; cancel = false;

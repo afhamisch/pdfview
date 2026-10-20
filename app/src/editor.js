@@ -24,6 +24,7 @@ export function undo() {
   S.pages = st.p.map(([u, r]) => { const p = PG(u); p.rot = r; return p; });
   const keep = new Set(S.pages.map(p => p.uid)); S.osel = new Set([...S.osel].filter(u => keep.has(u)));
   S.sel = null; S.editing = null; $('#undoBtn').disabled = !S.undo.length; markDirty();
+  S.pages.forEach(p => { if (p.ocr) emit('ocr:refresh', p); });
   if (S.org) emit('org:render');
   else if (before !== S.pages.map(p => p.uid).join(',')) { buildPages(); emit('pages:changed'); }
   else layout();
@@ -50,11 +51,14 @@ async function pageBlocks(p) {
       blocks = blocks.concat(buildBlocks(items, { ocr: { ascent: 0.8, descent: 0.2 } }).map(b => Object.assign(b, { covered: true, ocr: true })));
     }
     p.edit = { blocks, an, ocrAt }; p.editBusy = null;
+    if (lastMove && lastMove.target.closest && lastMove.target.closest('.pg') === p.sec) hoverMove(lastMove);
   })().catch(e => { console.warn('blocks', e); p.edit = { blocks: [], an: null, ocrAt }; p.editBusy = null; });
   return null;
 }
+let lastMove = null;
 export function clearHover() { if (S.hover) { S.hover.box.remove(); S.hover = null; } }
 function hoverMove(e) {
+  lastMove = e;
   if (S.tool !== 'text' || S.editing != null || S.lifting || S.org || S.mode === 'sign') { clearHover(); return; }
   const sec = e.target.closest && e.target.closest('.pg'), p = sec && PG(+sec.dataset.uid);
   if (!p || !p.vp) { clearHover(); return; }
@@ -64,8 +68,9 @@ function hoverMove(e) {
   if (S.hover && (S.hover.bl !== bl || S.hover.p !== p || !S.hover.box.isConnected)) clearHover();
   if (bl && !S.hover) { const box = el('div', { class: 'liftbox', title: bl.covered ? 'Click to edit (the original is covered)' : 'Click to edit this text' }); place(box, p, blockRect(bl, 2, 1)); p.ol.append(box); S.hover = { p, bl, box }; }
 }
+const rendered = p => new Promise(res => { const t0 = performance.now(); const tick = () => { if ((p.key && !p.task) || !p.visible || performance.now() - t0 > 4000) res(); else setTimeout(tick, 40); }; tick(); });
 async function commitLib() { const bytes = await S.lib.save({ updateFieldAppearances: false }); await reloadMain(bytes); }
-async function revertLifts(n) { const lib = await libDoc(); while (S.lifts.length > n) restoreContents(lib, S.lifts.pop()); await commitLib(); }
+async function revertLifts(n) { S.lifting = true; try { const lib = await libDoc(); while (S.lifts.length > n) restoreContents(lib, S.lifts.pop()); await commitLib(); } finally { S.lifting = false; } }
 /* Take a block off the page and hand it to the editor as a text object. */
 export async function liftBlock(p, bl) {
   if (S.lifting) return; S.lifting = true; clearHover();
@@ -74,10 +79,18 @@ export async function liftBlock(p, bl) {
     const o = { type: 'text', text: bl.text, size: Math.round(bl.size * 100) / 100, color: bl.color || '#111111', font: fi.font, bold: fi.bold, italic: fi.italic, underline: false, align: bl.align, list: 'none', lead: Math.round(bl.lead * 1000) / 1000 };
     const s0 = bl.s0 - PAD, top = bl.b1 + o.size * baselineAt(o, 0) + PAD, W = bl.s1 - bl.s0;
     Object.assign(o, { x: bl.u[0] * s0 + bl.n[0] * top, y: bl.u[1] * s0 + bl.n[1] * top, a: ((bl.angle % 360) + 360) % 360, w: W + 2 * PAD + 2 + W * 0.01 });
+    // recognized words under the block (a scan that also carries a text layer, or an OCR block itself) go with it
+    const inBlock = p.ocr ? p.ocr.words.map((w, i) => { const c = offset(w.tl, p.ocr.rot, w.w / 2, w.h / 2), sv = c[0] * bl.u[0] + c[1] * bl.u[1], bv = c[0] * bl.n[0] + c[1] * bl.n[1]; return sv >= bl.s0 - 1 && sv <= bl.s1 + 1 && bv >= bl.bBot - 1 && bv <= bl.bTop + 1 ? i : -1; }).filter(i => i >= 0) : [];
+    const ocrIdx = [...new Set([...(bl.ocr ? bl.idxs : []), ...inBlock])];
+    if (ocrIdx.length) o.ocrIdx = ocrIdx;
     pushUndo();
-    if (!bl.covered && p.src === 0 && p.edit && p.edit.an) { const lib = await libDoc(); S.lifts.push(removeBlock(lib, p.si, p.edit.an, bl)); await commitLib(); }
+    if (!bl.covered && p.src === 0 && p.edit && p.edit.an) {
+      // the old text is hidden at once; the page itself follows when the rewritten document has rendered
+      const cover = el('div', { class: 'liftcover' }); place(cover, p, blockRect(bl, 1, 1)); p.sheet.append(cover);
+      try { const lib = await libDoc(); S.lifts.push(removeBlock(lib, p.si, p.edit.an, bl)); await commitLib(); await rendered(p); } finally { cover.remove(); }
+    }
     else { const r = blockRect(bl, 1, 1); addObj(p, { type: 'whiteout', x: r.x, y: r.y, w: r.w, h: r.h, a: r.a }); toast(bl.ocr ? 'Recognized text: the scanned words are covered with white and the text is typed on top.' : 'This text is part of a graphic, so it is covered with white and typed on top.', 5000); }
-    const obj = addObj(p, o); setTool('select'); setTimeout(() => startEdit(obj), 0);
+    const obj = addObj(p, o); if (ocrIdx.length) emit('ocr:refresh', p); setTool('select'); setTimeout(() => startEdit(obj), 0);
   } catch (e) { console.error(e); toast('That text could not be opened for editing.'); }
   finally { S.lifting = false; }
 }
@@ -165,7 +178,7 @@ export function startEdit(o) {
   t.addEventListener('paste', ev => { ev.preventDefault(); document.execCommand('insertText', false, (ev.clipboardData || window.clipboardData).getData('text/plain')); });
   t.addEventListener('blur', () => {
     t.contentEditable = 'false'; S.editing = null; o.text = t.innerText.replace(/\n$/, '');
-    if (!o.text.trim()) { S.objects = S.objects.filter(x => x !== o); if (S.sel === o.id) S.sel = null; }
+    if (!o.text.trim()) { S.objects = S.objects.filter(x => x !== o); if (S.sel === o.id) S.sel = null; if (o.ocrIdx) emit('ocr:refresh', p); }
     renderObjs(p); emit('ctx');
   }, { once: true });
   t.focus();
@@ -174,7 +187,7 @@ export function startEdit(o) {
 }
 export function addObj(p, o) { o.id = nextUid(); o.page = p.uid; S.objects.push(o); S.sel = o.id; renderObjs(p); markDirty(); emit('ctx'); emit('obj:added', o); return o; }
 export function removeSel() {
-  if (S.sel == null) return; pushUndo();
+  if (S.sel == null) return; pushUndo(); { const o = S.objects.find(x => x.id === S.sel); if (o && o.ocrIdx) { const p = PG(o.page); setTimeout(() => emit('ocr:refresh', p), 0); } }
   const o = S.objects.find(x => x.id === S.sel); S.objects = S.objects.filter(x => x.id !== S.sel); S.sel = null;
   if (o) { renderObjs(PG(o.page)); emit('obj:removed', o); } markDirty(); emit('ctx');
 }

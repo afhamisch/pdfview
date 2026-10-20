@@ -18,3 +18,6 @@ export const on = (type, fn) => bus.addEventListener(type, e => fn(e.detail));
 let uid = 1, puid = 1, srcSeq = 1;
 export const nextUid = () => uid++, nextPuid = () => puid++, nextSrc = () => srcSeq++;
 export const PG = u => S.reg.get(u);
+// OCR words that an edited block replaced (see liftBlock in editor.js): they stay out of the selectable
+// layer, the search index and the saved file while the object that replaced them exists.
+export function coveredWords(p) { const out = new Set(); for (const o of S.objects) if (o.page === p.uid && o.ocrIdx) for (const i of o.ocrIdx) out.add(i); return out; }
