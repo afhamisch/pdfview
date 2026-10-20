@@ -47,6 +47,10 @@ out.orgOrder = await page.$$eval('#orgGrid .oth .src', e => e.map(x => x.textCon
 out.pgAfterOrg = await page.$$eval('.pg .src-note, .pg-lbl', e => e.length);
 const saved2 = await dl(() => page.click('#saveBtn')); const d2 = await PDFDocument.load(saved2.bytes); out.saved2Pages = d2.getPageCount();
 const t2 = await textOf(saved2.bytes); out.firstPageNowTerms = /Terms of engagement/.test(t2[0]) || t2[0].length < 40;
+// flatten: save again with the checkbox on; the form is gone but the values remain as page text
+await page.check('#flatten'); const saved3 = await dl(() => page.click('#saveBtn')); await page.uncheck('#flatten');
+const d3 = await PDFDocument.load(saved3.bytes); let nf = -1; try { nf = d3.getForm().getFields().length; } catch { nf = 0; }
+const t3 = await textOf(saved3.bytes); out.flatten = { fields: nf, valueStillVisible: t3.some(t => /Alan F\. Hamisch/.test(t)) };
 // print opens a new tab
 const pop = await Promise.race([ctx.waitForEvent('page').then(p => 'tab:' + p.url().slice(0, 5)).catch(() => 'tab-timeout'), page.waitForEvent('download').then(d => 'download:' + d.suggestedFilename()).catch(() => 'dl-timeout'), (async () => { await page.click('#printBtn'); await new Promise(r => setTimeout(r, 15000)); return 'none'; })()]); out.print = pop;
 out.logs = logs.slice(0, 10); console.log(JSON.stringify(out, null, 1)); await browser.close();

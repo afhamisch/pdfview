@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "build:offline": "OFFLINE=1 vite build --outDir dist-offline",
-    "test": "node test/smoke.js"
+    "test": "echo \"Browser tests: node test/m1.js URL PDF, node test/m2.js URL, node test/m3.js URL (see README)\""
   },
   "dependencies": {
     "pdf-lib": "^1.17.1",

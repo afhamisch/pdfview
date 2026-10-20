@@ -52,18 +52,20 @@ export async function loadDoc(bytes) {
   try { return { doc: await task.promise }; } catch (e) { return { error: e, needsPw: needsPw || e?.name === 'PasswordException' }; }
 }
 
+const mark = n => { try { performance.mark('pdfview:' + n); } catch {} };
 export async function openBytes(bytes, name, { sample = false, quiet = false } = {}) {
-  const prep = await prepare(bytes); bytes = prep.bytes;
-  const r = await loadDoc(bytes);
+  mark('open-start');
+  const prep = await prepare(bytes); bytes = prep.bytes; mark('prepared');
+  const r = await loadDoc(bytes); mark('loaded');
   if (!r.doc) { console.error(r.error); toast(r.needsPw ? 'This PDF is password protected. Remove the password, then open it here.' : 'That file could not be opened as a PDF.'); return false; }
   const { doc } = r;
   destroySources();
   Object.assign(S, { doc, bytes, name, sample, pages: [], reg: new Map(), sources: new Map([[0, { id: 0, name, bytes, doc }]]), objects: [], sel: null, editing: null, undo: [], dirty: false, fit: 'width', org: false, osel: new Set(), anchor: null, bates: prep.bates || null, meta: {}, formDirty: new Set() });
   const proxies = await Promise.all(Array.from({ length: doc.numPages }, (_, i) => doc.getPage(i + 1)));
-  proxies.forEach((proxy, i) => S.pages.push(newPage(0, i, proxy)));
+  proxies.forEach((proxy, i) => S.pages.push(newPage(0, i, proxy))); mark('pages');
   S.objects = (prep.objects || []).filter(o => o.page >= 0 && o.page < doc.numPages).map(o => Object.assign({}, o, { id: nextUid(), page: S.pages[o.page].uid }));
   try { S.meta.outline = await doc.getOutline(); } catch { S.meta.outline = null; }
-  emit('doc:open');
+  mark('outline'); emit('doc:open'); mark('built');
   const k = S.objects.length;
   if (quiet) return true;
   if (prep.stale) toast('This PDF was changed in another program after it was saved here, so items added earlier are now part of the page and cannot be edited.');
