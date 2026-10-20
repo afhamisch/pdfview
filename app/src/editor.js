@@ -38,6 +38,7 @@ function objEl(p, o) {
   const d = el('div', { class: 'obj obj-' + o.type + (S.sel === o.id ? ' sel' : '') + (o.type === 'field' ? ' sc' + ((o.signer % 5) + 1) : ''), dataset: { id: o.id } });
   if (o.type === 'text') {
     const t = el('div', { class: 'txt', text: o.text, style: { fontSize: o.size * S.scale + 'px', color: o.color, padding: 2 * S.scale + 'px' } });
+    if (o.box) { d.classList.add('boxed'); t.style.borderWidth = Math.max(1, 1.5 * S.scale) + 'px'; t.style.borderColor = o.color; t.style.padding = `${3 * S.scale}px ${6 * S.scale}px`; }
     d.append(t); d.addEventListener('dblclick', () => startEdit(o));
   } else if (o.type === 'image') d.append(el('img', { src: o.src, alt: 'Signature', draggable: 'false' }));
   else if (o.type === 'check') d.innerHTML = `<svg viewBox="0 0 100 100" preserveAspectRatio="none"><polyline points="12,55 40,82 90,18" fill="none" stroke="${o.color}" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
@@ -119,6 +120,10 @@ function sheetDown(p, e) {
     pushUndo(); const tl = offset(P, R, -2, -(S.tsize * 0.75 + 2));
     const o = addObj(p, { type: 'text', x: tl[0], y: tl[1], a: R, text: '', size: S.tsize, color: S.tcolor });
     setTool('select'); setTimeout(() => startEdit(o), 0);
+  } else if (tool === 'stamp') {
+    pushUndo(); const text = S.stamp || STAMPS[0], size = 14; const tl = offset(P, R, -(text.length * size * 0.33), -(size * 0.9));
+    addObj(p, { type: 'text', box: true, x: tl[0], y: tl[1], a: R, text, size, color: S.tcolor === '#111111' ? '#b3261e' : S.tcolor });
+    setTool('select');
   } else if (tool === 'check') {
     pushUndo(); const z = 12, tl = offset(P, R, -z / 2, -z / 2);
     addObj(p, { type: 'check', x: tl[0], y: tl[1], w: z, h: z, ar: 1, a: R, color: S.tcolor });
@@ -181,14 +186,25 @@ export function setTool(t) {
   emit('ctx');
 }
 const COLORS = [['#111111', 'Black'], ['#1a3a8f', 'Blue'], ['#b3261e', 'Red']];
+const today = () => new Date().toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
+export const STAMPS = ['EXHIBIT A', 'EXHIBIT B', 'EXHIBIT 1', 'FILED', 'RECEIVED ' + today(), 'CONFIDENTIAL', 'COPY', 'DRAFT', 'COMPOSITE EXHIBIT'];
 function renderCtx(c) {
   const o = S.sel != null && S.objects.find(x => x.id === S.sel);
   if (!o) {
     if (S.tool === 'sign' && S.sig) { c.append(el('span', { text: 'Click on the page to place your signature.' }), el('button', { class: 'mini', type: 'button', text: 'Change signature', onclick: () => openSig().then(s => { if (s) S.sig = s; }) })); return true; }
+    if (S.tool === 'stamp') {
+      c.append(el('span', { text: 'Stamp:' }));
+      const sel = el('select', { class: 'ctl', id: 'stampPick', 'aria-label': 'Stamp wording' }); STAMPS.forEach(t => sel.append(el('option', { value: t, text: t }))); sel.append(el('option', { value: '', text: 'Custom…' }));
+      sel.value = STAMPS.includes(S.stamp) ? S.stamp : S.stamp ? '' : STAMPS[0];
+      const custom = el('input', { class: 'ctl', id: 'stampText', placeholder: 'Stamp wording', value: STAMPS.includes(S.stamp) ? '' : (S.stamp || ''), hidden: sel.value !== '' });
+      sel.addEventListener('change', () => { custom.hidden = sel.value !== ''; if (sel.value) S.stamp = sel.value; else { S.stamp = custom.value.trim() || 'STAMP'; custom.focus(); } });
+      custom.addEventListener('input', () => { S.stamp = custom.value.trim() || 'STAMP'; });
+      c.append(sel, custom, el('span', { text: 'then click on the page to place it.' })); return true;
+    }
     if (S.tool === 'highlight' || S.tool === 'whiteout' || S.tool === 'redact') { c.append(el('span', { text: `Drag a box on the page, or select text and press ${S.tool === 'highlight' ? 'H' : S.tool === 'whiteout' ? 'W' : 'R'} again to mark the selection.` })); return true; }
     return false;
   }
-  c.append(el('span', { class: 'lbl', text: { text: 'Text', check: 'Check mark', image: 'Signature', highlight: 'Highlight', whiteout: 'White-out', redact: 'Redaction', field: 'Signature field' }[o.type] }));
+  c.append(el('span', { class: 'lbl', text: { text: o.box ? 'Stamp' : 'Text', check: 'Check mark', image: 'Signature', highlight: 'Highlight', whiteout: 'White-out', redact: 'Redaction', field: 'Signature field' }[o.type] }));
   if (o.type === 'redact') c.append(el('span', { text: 'Content under this box is permanently removed when you save.', style: { color: 'var(--redline)' } }));
   if (o.type === 'text') {
     const sz = el('select', { class: 'ctl', 'aria-label': 'Text size' });
@@ -237,7 +253,7 @@ export function init() {
     if ((e.key === 'Delete' || e.key === 'Backspace') && S.sel != null) { e.preventDefault(); removeSel(); return true; }
     if (e.key === 'Escape') { if (S.sel != null) select(null); else setTool('select'); return true; }
     if (mod || e.altKey) return false;
-    const k = { v: 'select', t: 'text', k: 'check', s: 'sign', h: 'highlight', w: 'whiteout', r: 'redact' }[e.key.toLowerCase()];
+    const k = { v: 'select', t: 'text', m: 'stamp', k: 'check', s: 'sign', h: 'highlight', w: 'whiteout', r: 'redact' }[e.key.toLowerCase()];
     if (k && S.doc) { if ((k === 'highlight' || k === 'whiteout' || k === 'redact') && markSelection(k)) return true; setTool(k); return true; }
     return false;
   });

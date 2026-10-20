@@ -20,13 +20,15 @@ Viewer
 - print by opening the saved PDF in the browser's own print path
 
 Editor
-- fill form fields, add text, check marks, signatures (draw or type),
-  highlight, white-out
+- fill form fields, add text, stamps with presets (exhibit labels, FILED,
+  CONFIDENTIAL, dated RECEIVED, custom), check marks, signatures (draw or
+  type), highlight, white-out
 - redaction: the page is rasterized with the boxes burned in, fields,
   annotations and document metadata on that page are removed, unreferenced
   objects are dropped from the saved file
 - organize pages: reorder, rotate, delete, insert pages from another PDF,
-  extract selected pages to a new file
+  extract selected pages to a new file, combine files by opening or
+  dropping several at once
 - Bates numbering: prefix, start number, zero padding, corner, font size
 - save a new copy; added items stay editable when the copy is reopened here
 

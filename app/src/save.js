@@ -76,7 +76,7 @@ async function sourceBytes(src) {
 /* Build the output PDF. Returns { bytes, redacted }. */
 export async function buildPdf({ editLayer = true } = {}) {
   const doc = await PDFDocument.load(await sourceBytes(S.sources.get(0)), { ignoreEncryption: true, updateMetadata: false });
-  const helv = await doc.embedFont(StandardFonts.Helvetica);
+  const helv = await doc.embedFont(StandardFonts.Helvetica), helvB = await doc.embedFont(StandardFonts.HelveticaBold);
   const flatten = $('#flatten').checked;
   const keptMain = new Set(S.pages.filter(p => p.src === 0).map(p => p.si));
   let form = null; try { form = doc.getForm(); } catch {}
@@ -118,6 +118,14 @@ export async function buildPdf({ editLayer = true } = {}) {
       else if (o.type === 'highlight') page.drawRectangle({ x: bl[0], y: bl[1], width: o.w, height: o.h, rotate: rot, color: rgb(1, .83, 0), opacity: .42, blendMode: BlendMode.Multiply });
       else if (o.type === 'image') { const img = imgCache[o.src] || (imgCache[o.src] = await doc.embedPng(o.src)); page.drawImage(img, { x: bl[0], y: bl[1], width: o.w, height: o.h, rotate: rot }); }
       else if (o.type === 'check') { const pts = [[.12, .45], [.40, .82], [.90, .18]].map(([u, v]) => offset([o.x, o.y], o.a, u * o.w, v * o.h)); const th = Math.max(1, o.w * .13); for (let i = 0; i < 2; i++) page.drawLine({ start: { x: pts[i][0], y: pts[i][1] }, end: { x: pts[i + 1][0], y: pts[i + 1][1] }, thickness: th, color: hexRgb(o.color), lineCap: LineCapStyle.Round }); }
+      else if (o.type === 'text' && o.box) {
+        // stamp: bold text inside a border, sized from the text itself
+        const font = helvB, lines = clean(o.text, font).split('\n'), padX = 6, padY = 3, lh = o.size * 1.15;
+        const tw = Math.max(...lines.map(l => font.widthOfTextAtSize(l, o.size)), 1), bw = tw + 2 * padX, bh = lines.length * lh + 2 * padY;
+        const corner = offset([o.x, o.y], o.a, 0, bh);
+        page.drawRectangle({ x: corner[0], y: corner[1], width: bw, height: bh, rotate: rot, borderColor: hexRgb(o.color), borderWidth: 1.5 });
+        lines.forEach((line, i) => { if (!line) return; const b = offset([o.x, o.y], o.a, padX, padY + lh * i + o.size * 0.93); page.drawText(line, { x: b[0], y: b[1], size: o.size, font, color: hexRgb(o.color), rotate: rot }); });
+      }
       else if (o.type === 'text') clean(o.text, helv).split('\n').forEach((line, i) => { if (!line) return; const b = offset([o.x, o.y], o.a, 2, 2 + o.size * (1.2 * i + 0.93)); page.drawText(line, { x: b[0], y: b[1], size: o.size, font: helv, color: hexRgb(o.color), rotate: rot }); });
       if (!isRed) { const c = Object.assign({}, o, { page: idx }); delete c.id; kept.push(c); }
     }
