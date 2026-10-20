@@ -110,3 +110,8 @@ body[data-mode="sign"] .pg-actions{display:none}
 .sigbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .signer-chip{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;border-radius:14px;border:1.5px solid var(--c,var(--acc));background:var(--surface);cursor:pointer;font-size:12px}.signer-chip[aria-pressed="true"]{background:var(--c,var(--acc));color:#fff}
 .done-card{max-width:560px;margin:60px auto;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:30px 34px;text-align:center}.done-card h2{margin:8px 0}.done-card svg{width:40px;height:40px;color:#2e7d32}
+
+/* OCR */
+.ocrLayer{position:absolute;inset:0;z-index:1;pointer-events:none;overflow:hidden;user-select:text}.ocrLayer span.ocr{position:absolute;color:transparent;white-space:pre;cursor:text;transform-origin:0 0;overflow:hidden;font-family:sans-serif;pointer-events:auto}.ocrLayer ::selection{background:rgba(0,0,255,.25)}.ocrLayer .hit{background:rgba(255,200,0,.55);color:transparent}.ocrLayer .hit.cur{background:rgba(255,120,0,.7)}
+body:not([data-tool="select"]) .ocrLayer span{pointer-events:none}
+.ocr-progress{display:flex;align-items:center;gap:10px;flex:1}.ocr-progress progress{flex:1;max-width:360px;height:10px}

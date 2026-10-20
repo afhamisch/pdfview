@@ -107,6 +107,15 @@ export async function buildPdf({ editLayer = true } = {}) {
     if (p.rot) page.setRotation(degrees(rotOf(p)));
     const objs = S.objects.filter(x => x.page === p.uid && x.type !== 'field');
     const bx = S.bates ? batesBox(p, idx, S.bates, (s, size) => helv.widthOfTextAtSize(s, size)) : null;
+    if (p.ocr && p.ocr.words.length) {
+      // recognized text goes in as invisible text so the file is searchable elsewhere; it does not change the page's look
+      page.getContentStream(false);
+      for (const wd of p.ocr.words) {
+        const t = clean(wd.text, helv); if (!t.trim()) continue;
+        const size = Math.max(2, Math.min(72, wd.h * 0.85)); const b = offset(wd.tl, p.ocr.rot, 0, wd.h * 0.8);
+        page.drawText(t, { x: b[0], y: b[1], size, font: helv, color: rgb(0, 0, 0), opacity: 0, rotate: degrees(p.ocr.rot) });
+      }
+    }
     if (!objs.length && !bx) continue;
     const isRed = objs.some(o => o.type === 'redact');
     if (isRed) { redIdx.push(idx); redRects.set(idx, objs.filter(o => o.type === 'redact')); }

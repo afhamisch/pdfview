@@ -34,6 +34,7 @@ export const SHELL = `
       <button class="tb" id="undoBtn" title="Undo (Ctrl+Z)" disabled>${ICON.undo}<span class="t">Undo</span></button>
       <button class="tb" id="orgBtn" aria-pressed="false" disabled title="Organize pages: reorder, insert, rotate, delete">${ICON.org}<span class="t">Organize</span></button>
       <button class="tb" id="batesBtn" disabled title="Bates numbering">${ICON.bates}<span class="t">Bates</span></button>
+      <button class="tb" id="ocrBtn" disabled title="Recognize text on scanned pages (OCR)">${ICON.ocr}<span class="t">OCR</span></button>
     </div>
     <div class="grp">
       <button class="tb" id="printBtn" disabled title="Print (Ctrl+P)">${ICON.print}<span class="t">Print</span></button>

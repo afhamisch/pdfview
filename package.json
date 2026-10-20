@@ -14,6 +14,11 @@
     "build:offline": "npm --workspace app run build:offline",
     "start": "npm --workspace server start",
     "test": "npm --workspace server test && npm --workspace app test",
-    "desktop:build": "npm --workspace desktop run build"
+    "desktop:build": "npm --workspace desktop run build",
+    "build:desktop": "npm --workspace app run build:desktop"
+  },
+  "dependencies": {
+    "@tesseract.js-data/eng": "^1.0.0",
+    "tesseract.js": "^7.0.0"
   }
 }

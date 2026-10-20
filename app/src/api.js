@@ -1,7 +1,7 @@
 // Calls to the envelope service. The admin token is kept in localStorage and asked for on a 401.
 import { el, $ } from './ui.js';
 const KEY = 'pdfview.adminToken';
-export const served = () => location.protocol.startsWith('http') && !__OFFLINE__;
+export const served = () => location.protocol.startsWith('http') && !__OFFLINE__ && !window.__TAURI__;
 export function getToken() { try { return localStorage.getItem(KEY) || ''; } catch { return ''; } }
 export function setToken(t) { try { localStorage.setItem(KEY, t); } catch {} }
 export function askToken(message) {

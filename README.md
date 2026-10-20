@@ -20,7 +20,9 @@ npm run build            # builds app/dist
 npm start                # serves the app and the envelope API on http://localhost:8787
 ```
 
-The server prints an admin token on first start and writes it to
+Email: set `SMTP_URL` and `MAIL_FROM` on the server (one mailbox for the whole
+firm; each message carries a reply-to of whoever sent the envelope). The server
+prints an admin token on first start and writes it to
 `server/data/admin-token.txt`. The app asks for it the first time you open the
 Envelopes panel or send a document. See `server/README.md` for the environment
 variables (port, data directory, SMTP for email, base URL for signing links).
@@ -40,6 +42,12 @@ Viewer: pdf.js in a real worker, pages rendered on demand and released when far
 away (a 500-page file or a 150 MB scan stays responsive), text selection, find
 with highlighting, thumbnails and bookmarks, page readout with go-to, zoom that
 keeps your place, rotate, print through the browser's own PDF viewer.
+
+OCR: scanned pages are recognized on this computer (tesseract.js, English);
+the words become selectable and searchable at once and are written into the
+saved copy as invisible text so Acrobat, Edge and e-filing portals can search
+it too. Available in the served app and the desktop wrapper (the engine files
+are about 15 MB and are not inlined into the single offline file).
 
 Editor: fill form fields, add text, stamps (EXHIBIT, FILED, CONFIDENTIAL or your
 own wording), check marks, signatures (draw or type), highlight, white-out, redact (the page is rasterized with the boxes burned in,
@@ -64,6 +72,7 @@ cd app && node test/m2.js URL        # editor: fill, text, highlight, redact, Ba
 cd app && node test/m3.js URL        # envelopes: compose, send, two signers, completed download
 cd app && node test/real.js URL PDF DIR  # full round trip on a real file (scan, rotated pages), screenshots to DIR
 cd app && node test/forms.js URL PDF DIR NAME  # fill a form-heavy PDF, save fillable and flattened, reopen
+cd app && node test/ocr.js URL PDF WORD DIR    # OCR a scan, search WORD, save with invisible text, reopen and search
 ```
 
 The browser tests need Playwright with Chromium and a server (or a static
@@ -77,6 +86,6 @@ Actions builds it and uploads the installer as an artifact.
 
 ## Limits of this release
 
-No OCR, no document compare, no bookmark editing. The e-signature service keeps an
+No document compare, no bookmark editing, OCR in English only. The e-signature service keeps an
 audit trail but does not apply PKCS#7 digital signatures or trusted timestamps,
 and nothing in the interface claims legal compliance. See `ROADMAP.md`.

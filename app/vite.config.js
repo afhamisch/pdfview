@@ -2,8 +2,9 @@ import { defineConfig } from 'vite';
 import { viteSingleFile } from 'vite-plugin-singlefile';
 
 export default defineConfig(({ mode }) => {
-  const offline = mode === 'offline' || !!process.env.OFFLINE;
+  const offline = mode === 'offline' || !!process.env.OFFLINE, desktop = mode === 'desktop';
   return {
+  base: desktop ? './' : '/',
   define: { __OFFLINE__: JSON.stringify(offline) },
   plugins: offline ? [viteSingleFile({ removeViteModuleLoader: true })] : [],
   build: {

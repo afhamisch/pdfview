@@ -49,9 +49,15 @@ Offline build
 - `npm run build:offline` produces one HTML file (worker inlined) that
   opens from disk with no server, viewer and editor only
 
+OCR
+- English text recognition for scanned pages in the browser (tesseract.js),
+  selectable and searchable immediately, written into the saved file as
+  invisible text
+
 ## Out of scope for v0.1
 
-- OCR, document compare, bookmark editing, form field creation
+- document compare, bookmark editing, form field creation, OCR languages
+  other than English
 - Windows installer built locally: the Tauri wrapper in `desktop/` is built
   by the GitHub Actions workflow on a Windows runner
 - PKCS#7 digital signatures and trusted timestamps on completed envelopes

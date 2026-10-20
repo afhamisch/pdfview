@@ -5,12 +5,12 @@ export function createMailer({ smtpUrl, from }) {
   const transport = smtpUrl ? nodemailer.createTransport(smtpUrl) : null;
   return {
     configured: !!transport,
-    async send({ to, subject, text, attachments }) {
+    async send({ to, subject, text, attachments, replyTo }) {
       if (!transport) {
         console.log(`mail not configured; would send "${subject}" to ${to}`);
         return false;
       }
-      await transport.sendMail({ from, to, subject, text, attachments });
+      await transport.sendMail({ from, to, subject, text, attachments, replyTo: replyTo || undefined });
       return true;
     }
   };

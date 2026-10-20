@@ -10,7 +10,7 @@ import { ctxHooks, keyHooks } from './hooks.js';
 import { buildPdf } from './save.js';
 import { PDFDocument } from 'pdf-lib';
 
-const TW = 150, TH = 194, DIS = '#tools .tb,#zoomIn,#zoomOut,#zoomFit,#pgIn,#pgPrev,#pgNext,#batesBtn,#findBtn,#sendBtn,#printBtn';
+const TW = 150, TH = 194, DIS = '#tools .tb,#zoomIn,#zoomOut,#zoomFit,#pgIn,#pgPrev,#pgNext,#batesBtn,#ocrBtn,#findBtn,#sendBtn,#printBtn';
 let orgIO = null;
 function orgCanvas(p) { if (!p.oc) { p.oc = document.createElement('canvas'); p.okey = null; } return p.oc; }
 function ensureOrgThumb(p) {

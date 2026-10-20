@@ -67,7 +67,7 @@ export function createService({ db, dataDir, mailer, baseUrl, maxPdfBytes }) {
 
   async function mailSigner(env, signer, url) {
     const m = signingRequestMail({ senderName: env.sender_name, title: env.title, message: env.message, url });
-    try { await mailer.send({ to: signer.email, ...m }); } catch (e) { console.error('mail failed', e.message); }
+    try { await mailer.send({ to: signer.email, replyTo: env.sender_email, ...m }); } catch (e) { console.error('mail failed', e.message); }
   }
 
   async function createEnvelope(body, info) {
@@ -288,7 +288,7 @@ export function createService({ db, dataDir, mailer, baseUrl, maxPdfBytes }) {
     const m = completionMail({ title: data.title, envelopeId: eid });
     const recipients = [...data.signers.map(s => s.email), data.sender.email].filter(isEmail);
     for (const to of new Set(recipients)) {
-      try { await mailer.send({ to, ...m, attachments: [{ filename: `${safeName(data.title)}-completed.pdf`, content: bytes }] }); }
+      try { await mailer.send({ to, replyTo: data.sender?.email, ...m, attachments: [{ filename: `${safeName(data.title)}-completed.pdf`, content: bytes }] }); }
       catch (err) { console.error('mail failed', err.message); }
     }
   }

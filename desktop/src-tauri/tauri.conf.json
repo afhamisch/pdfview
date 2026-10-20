@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "identifier": "com.napleslitigation.pdfview",
   "build": {
-    "frontendDist": "../../app/dist-offline"
+    "frontendDist": "../../app/dist-desktop"
   },
   "app": {
     "withGlobalTauri": true,
