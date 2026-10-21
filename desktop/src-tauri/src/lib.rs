@@ -120,6 +120,8 @@ pub fn run() {
             }
         }))
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .manage(Pending(Mutex::new(file_args(std::env::args()))))
         .invoke_handler(tauri::generate_handler![
             pending_files,

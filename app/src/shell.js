@@ -30,6 +30,7 @@ export const SHELL = `
     </div>
     <div class="grp">
       <button class="tb" id="undoBtn" title="Undo (Ctrl+Z)" disabled>${ICON.undo}<span class="t">Undo</span></button>
+      <button class="tb" id="redoBtn" title="Redo (Ctrl+Y)" disabled>${ICON.redo}<span class="t">Redo</span></button>
       <button class="tb" id="orgBtn" aria-pressed="false" disabled title="Organize pages: reorder, insert, rotate, delete">${ICON.org}<span class="t">Organize</span></button>
       <button class="tb" id="batesBtn" disabled title="Bates numbering">${ICON.bates}<span class="t">Bates</span></button>
       <button class="tb" id="ocrBtn" disabled title="Recognize text on scanned pages (OCR)">${ICON.ocr}<span class="t">OCR</span></button>
@@ -60,6 +61,7 @@ export const SHELL = `
 </div>
 <div class="drop-hint" id="dropHint" hidden>Drop the PDF to open it</div>
 <div class="toast" id="toast" hidden></div>
+<div class="updatebar" id="updateBar" hidden role="status"><span id="updateMsg"></span><button class="btn primary" id="updateRestart" type="button">Restart now</button><button class="btn" id="updateLater" type="button">Later</button></div>
 
 <div class="mback" id="sigModal" hidden><div class="modal" role="dialog" aria-modal="true" aria-labelledby="sigTitle">
   <h3 id="sigTitle">Create your signature</h3>

@@ -61,6 +61,10 @@ under Notes in the sidebar. Info shows the document properties (size, page
 size, version, dates, creator, fonts, attachments) and lets you change the
 title, author, subject and keywords, or strip all metadata on save.
 
+Undo and Redo (Ctrl+Z, Ctrl+Y). Hold Shift while drawing with the marker for
+a straight stroke, and with the shape tool for lines and arrows snapped to
+45 degree steps or for a square and a circle.
+
 Several PDFs open at once, one per tab: each keeps its pages, placed items,
 typed form values, undo history and scroll position. Ctrl+] and Ctrl+[ switch
 tabs; in the desktop app Ctrl+PageDown, Ctrl+PageUp, Ctrl+Tab and Ctrl+W work
@@ -110,8 +114,10 @@ server for `dist`) at URL.
 
 See `desktop/README.md`. A Tauri wrapper registers the `.pdf` file association
 and opens files in this app. The `Desktop (Windows installer)` workflow under
-Actions builds it and uploads the installer as an artifact. `docs/DEPLOYMENT.md`
-describes the planned auto-update (signed releases the app installs itself).
+Actions builds it and uploads the installer as an artifact; merges to `main`
+also publish a signed GitHub Release that installed copies pick up on their
+own (a bar offers a restart when the update is ready). `docs/DEPLOYMENT.md`
+has the setup, including the two repository secrets the release needs.
 
 ## Limits of this release
 

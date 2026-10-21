@@ -7,6 +7,7 @@ on:
   workflow_dispatch:
 
 jobs:
+  # Every push: build the installer and keep it as a downloadable artifact.
   windows:
     runs-on: windows-latest
     steps:
@@ -32,3 +33,62 @@ jobs:
             desktop/src-tauri/target/release/bundle/nsis/*.exe
             desktop/src-tauri/target/release/bundle/msi/*.msi
           if-no-files-found: error
+
+  # Merges to main: a signed GitHub Release that installed copies pick up on their own.
+  # Needs the TAURI_SIGNING_PRIVATE_KEY and TAURI_SIGNING_PRIVATE_KEY_PASSWORD repository secrets;
+  # without them this job stops early and nothing is released.
+  release:
+    if: github.ref == 'refs/heads/main'
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    env:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+    steps:
+      - id: key
+        shell: bash
+        run: |
+          if [ -n "$TAURI_SIGNING_PRIVATE_KEY" ]; then echo "has=true" >> "$GITHUB_OUTPUT"; else echo "has=false" >> "$GITHUB_OUTPUT"; echo "No signing key in the repository secrets: no release."; fi
+      - if: steps.key.outputs.has == 'true'
+        uses: actions/checkout@v4
+      - if: steps.key.outputs.has == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - if: steps.key.outputs.has == 'true'
+        uses: dtolnay/rust-toolchain@stable
+      - if: steps.key.outputs.has == 'true'
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop/src-tauri
+      - if: steps.key.outputs.has == 'true'
+        run: npm ci
+      # The release version is 0.2.<run number>: every merge is a new, higher version with no manual bump.
+      - if: steps.key.outputs.has == 'true'
+        id: ver
+        shell: bash
+        run: |
+          V="0.2.${{ github.run_number }}"
+          node -e "const fs=require('fs');for(const f of ['desktop/src-tauri/tauri.conf.json','desktop/package.json']){const j=JSON.parse(fs.readFileSync(f));j.version='$V';fs.writeFileSync(f,JSON.stringify(j,null,2)+'\n')}"
+          sed -i "0,/^version = \".*\"/s//version = \"$V\"/" desktop/src-tauri/Cargo.toml
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+      - if: steps.key.outputs.has == 'true'
+        run: npm run build:desktop
+      - if: steps.key.outputs.has == 'true'
+        run: npx tauri icon icon.png
+        working-directory: desktop
+      - if: steps.key.outputs.has == 'true'
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: desktop
+          tagName: v${{ steps.ver.outputs.version }}
+          releaseName: PDFView v${{ steps.ver.outputs.version }}
+          releaseBody: Built from ${{ github.sha }}. Installed copies update themselves on next start.
+          releaseDraft: false
+          prerelease: false
+          includeUpdaterJson: true
+          updaterJsonPreferNsis: true

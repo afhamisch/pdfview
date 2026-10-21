@@ -24,6 +24,7 @@ const svg = (d, extra = '') => `<svg viewBox="0 0 24 24" fill="none" stroke="cur
 export const ICON = {
   open: svg('<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>'),
   close: svg('<path d="M6 6l12 12M18 6L6 18"/>'),
+  redo: svg('<path d="M21 7v6h-6"/><path d="M21 13a8 8 0 1 0-2.3 5.7"/>'),
   note: svg('<path d="M4 5a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1h-8l-5 4v-4H5a1 1 0 0 1-1-1z"/><path d="M8 8h8M8 11.5h5"/>'),
   info: svg('<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>'),
   saveas: svg('<path d="M5 4h10l4 4v12H5z"/><path d="M9 4v5h6"/><path d="M12 12v6M9 15l3 3 3-3"/>'),

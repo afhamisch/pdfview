@@ -51,7 +51,7 @@ function renderTabs() {
 }
 export function setEnabled(onOff) {
   $$('#tools .tb,#zoomIn,#zoomOut,#zoomFit,#pgIn,#pgPrev,#pgNext,#saveBtn,#saveAsBtn,#orgBtn,#batesBtn,#ocrBtn,#infoBtn,#printBtn,#sendBtn,#findBtn').forEach(b => b.disabled = !onOff);
-  $('#undoBtn').disabled = !onOff || !S.undo.length;
+  $('#undoBtn').disabled = !onOff || !S.undo.length; $('#redoBtn').disabled = !onOff || !S.redo.length;
   if (!onOff) { $('#zoomPct').textContent = '100%'; $('#pgIn').value = ''; $('#pgOf').textContent = 'of 0'; }
 }
 export function showRest() {
@@ -68,7 +68,7 @@ function requestClose(t) {
   closeArmed = { id: 0, at: 0 }; closeTab(t); if (!S.tabs.length) showRest();
 }
 on('doc:open', () => { renderTabs(); setEnabled(true); $('#dirtyDot').hidden = true; emit('ctx'); });
-on('tab:switch', () => { renderTabs(); setEnabled(true); $('#dirtyDot').hidden = !S.dirty; $('#undoBtn').disabled = !S.undo.length; emit('ctx'); });
+on('tab:switch', () => { renderTabs(); setEnabled(true); $('#dirtyDot').hidden = !S.dirty; $('#undoBtn').disabled = !S.undo.length; $('#redoBtn').disabled = !S.redo.length; emit('ctx'); });
 on('tabs:changed', renderTabs); on('dirty', renderTabs);
 on('doc:close', () => { $('#findbar').hidden = true; });
 
@@ -76,7 +76,7 @@ on('doc:close', () => { $('#findbar').hidden = true; });
 const HINT = {
   select: 'Select text to copy it, or click a field to fill it in. Click an added item to select it, drag to move it.',
   text: 'Click on the page where the text should start.', stamp: 'Pick a stamp, then click on the page to place it. Double-click a placed stamp to change its wording.', check: 'Click on the page to place a check mark.', sign: 'Click on the page to place your signature.',
-  highlight: 'Drag across text to highlight it, or drag a box over anything.', draw: 'Draw freehand with the marker or pen.', shape: 'Drag on the page to draw the shape.', erase: 'Drag over the part you want gone; it is painted white, like correction fluid.', snap: 'Drag a box around the part of the page you want; it is copied as an image, with buttons for the text or a PNG file.', whiteout: 'Drag a white box over anything you want to cover.',
+  highlight: 'Drag across text to highlight it, or drag a box over anything.', draw: 'Draw freehand with the marker or pen. Hold Shift for a straight line.', shape: 'Drag on the page to draw the shape.', erase: 'Drag over the part you want gone; it is painted white, like correction fluid.', snap: 'Drag a box around the part of the page you want; it is copied as an image, with buttons for the text or a PNG file.', whiteout: 'Drag a white box over anything you want to cover.',
   redact: 'Drag a black box over anything you want to redact. When you save, everything under the boxes is permanently removed from the file.',
   note: 'Click on the page to place a note. It is saved as a comment that Adobe and other viewers show.',
   field: 'Click on the page to place the field for the selected signer.'
