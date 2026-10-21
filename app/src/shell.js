@@ -26,13 +26,14 @@ export const SHELL = `
     </div>
     <div class="spacer"></div>
     <div class="grp" role="toolbar" aria-label="Tools" id="tools">
-      ${tool('select', 'Select', 'V')}${tool('text', 'Text', 'T')}${tool('stamp', 'Stamp', 'M')}${tool('check', 'Check', 'K')}${tool('sign', 'Sign', 'S')}${tool('highlight', 'Highlight', 'H')}${tool('draw', 'Marker', 'D')}${tool('shape', 'Shapes', 'A')}${tool('erase', 'Eraser', 'E')}${tool('whiteout', 'White-out', 'W')}${tool('redact', 'Redact', 'R')}${tool('snap', 'Snapshot', 'N')}
+      ${tool('select', 'Select', 'V')}${tool('text', 'Text', 'T')}${tool('stamp', 'Stamp', 'M')}${tool('check', 'Check', 'K')}${tool('sign', 'Sign', 'S')}${tool('highlight', 'Highlight', 'H')}${tool('note', 'Note', 'C')}${tool('draw', 'Marker', 'D')}${tool('shape', 'Shapes', 'A')}${tool('erase', 'Eraser', 'E')}${tool('whiteout', 'White-out', 'W')}${tool('redact', 'Redact', 'R')}${tool('snap', 'Snapshot', 'N')}
     </div>
     <div class="grp">
       <button class="tb" id="undoBtn" title="Undo (Ctrl+Z)" disabled>${ICON.undo}<span class="t">Undo</span></button>
       <button class="tb" id="orgBtn" aria-pressed="false" disabled title="Organize pages: reorder, insert, rotate, delete">${ICON.org}<span class="t">Organize</span></button>
       <button class="tb" id="batesBtn" disabled title="Bates numbering">${ICON.bates}<span class="t">Bates</span></button>
       <button class="tb" id="ocrBtn" disabled title="Recognize text on scanned pages (OCR)">${ICON.ocr}<span class="t">OCR</span></button>
+      <button class="tb" id="infoBtn" disabled title="Document properties: metadata, fonts, page size">${ICON.info}<span class="t">Info</span></button>
     </div>
     <div class="grp">
       <button class="tb" id="printBtn" disabled title="Print (Ctrl+P)">${ICON.print}<span class="t">Print</span></button>
@@ -40,14 +41,15 @@ export const SHELL = `
       <button class="tb" id="envBtn" title="Envelopes you have sent">${ICON.link}<span class="t">Envelopes</span></button>
     </div>
     <label class="chk" title="Bakes form entries into the page so they can no longer be edited"><input type="checkbox" id="flatten" disabled><span>Flatten</span></label>
-    <button class="btn primary" id="saveBtn" type="button" disabled>${ICON.save}Save<span class="dot" id="dirtyDot" hidden></span></button>
+    <button class="btn primary" id="saveBtn" type="button" disabled title="Save (Ctrl+S): writes back to the opened file when it can">${ICON.save}Save<span class="dot" id="dirtyDot" hidden></span></button>
+    <button class="btn" id="saveAsBtn" type="button" disabled title="Save as (Ctrl+Shift+S): choose a name and place">${ICON.saveas}Save as</button>
   </header>
   <div class="tabbar" id="tabbar" hidden><div class="tabs" id="tabs" role="tablist" aria-label="Open files"></div><button class="tabplus" id="tabPlus" type="button" title="Open another PDF" aria-label="Open another PDF">${ICON.plus}</button></div>
   <div class="ctx" id="ctx"></div>
   <div class="body">
     <aside id="side" hidden>
-      <div class="side-tabs"><button class="tb" id="tabPages" aria-pressed="true">Pages</button><button class="tb" id="tabOutline" aria-pressed="false">Bookmarks</button></div>
-      <div id="thumbs"></div><div id="outline" hidden></div>
+      <div class="side-tabs"><button class="tb" id="tabPages" aria-pressed="true">Pages</button><button class="tb" id="tabOutline" aria-pressed="false">Bookmarks</button><button class="tb" id="tabNotes" aria-pressed="false">Notes</button></div>
+      <div id="thumbs"></div><div id="outline" hidden></div><div id="notes" hidden></div>
     </aside>
     <main id="scroller"><div id="pages"></div>
       <div id="findbar" hidden><input id="findIn" type="search" placeholder="Find in document" autocomplete="off" spellcheck="false"><span id="findCount"></span><button class="ib" id="findPrev" title="Previous match (Shift+Enter)">${ICON.up}</button><button class="ib" id="findNext" title="Next match (Enter)">${ICON.down}</button><button class="ib" id="findClose" title="Close (Esc)">${ICON.close}</button></div>

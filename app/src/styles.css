@@ -140,3 +140,12 @@ body:not([data-tool="select"]) .ocrLayer span{pointer-events:none}
 
 .liftbox{position:absolute;border:1.5px dashed var(--acc);background:var(--acc-soft);pointer-events:none;border-radius:2px;box-sizing:border-box}
 .liftcover{position:absolute;background:#fff;z-index:2;pointer-events:none}
+
+.obj-note{cursor:move;overflow:visible}.obj-note>svg{display:block;width:100%;height:100%;filter:drop-shadow(0 1px 1px rgba(0,0,0,.25))}
+.notepop{position:absolute;left:calc(100% + 8px);top:0;width:250px;background:#fff8c2;color:#2a2200;border:1px solid #e3cf5a;border-radius:8px;box-shadow:0 6px 18px -6px rgba(0,0,0,.35);padding:8px;cursor:default;z-index:5;font:13px/1.35 var(--f)}
+.notepop .nhead{display:flex;align-items:center;gap:6px;margin-bottom:6px}.notepop .nauthor{flex:1;min-width:0;border:0;border-bottom:1px solid #e3cf5a;background:transparent;font:inherit;font-weight:600;padding:2px 0;outline:0;color:inherit}.notepop .ndate{font-size:11px;color:#7a6a1a}
+.notepop .ntext{display:block;width:100%;min-height:72px;resize:vertical;border:0;background:transparent;font:inherit;outline:0;color:inherit;padding:0}
+.note-row{display:block;width:100%;text-align:left;border:0;border-bottom:1px solid var(--line);background:transparent;padding:8px 10px;cursor:pointer;color:var(--ink);font:inherit}.note-row:hover{background:var(--acc-soft)}.note-row .nmeta{font-size:11px;color:var(--muted);margin-bottom:2px}.note-row.mine .nmeta::before{content:"";display:inline-block;width:8px;height:8px;border-radius:2px;background:#ffd400;border:1px solid #c9a800;margin-right:5px;vertical-align:middle}.note-row .nbody{font-size:13px;white-space:pre-wrap}
+.modal.info h4{margin:16px 0 6px;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}.props{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;margin:0;font-size:13px}.props dt{color:var(--muted)}.props dd{margin:0;word-break:break-word}
+.pform{display:grid;gap:6px;margin-bottom:10px}.prow{display:grid;grid-template-columns:90px 1fr;align-items:center;gap:8px;font-size:13px}.prow .ctl{height:30px;border:1px solid var(--line);border-radius:6px;padding:0 8px;font:inherit;background:var(--surface);color:var(--ink)}
+.fonts{display:flex;flex-wrap:wrap;gap:6px;font-size:12px}.fchip{padding:2px 8px;border:1px solid var(--line);border-radius:10px;background:var(--well)}

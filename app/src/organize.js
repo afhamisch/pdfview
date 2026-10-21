@@ -9,6 +9,7 @@ import { newPage, loadSource } from './document.js';
 import { ctxHooks, keyHooks } from './hooks.js';
 import { buildPdf } from './save.js';
 import { PDFDocument } from 'pdf-lib';
+import { writeOut } from './fileio.js';
 
 const TW = 150, TH = 194, DIS = '#tools .tb,#zoomIn,#zoomOut,#zoomFit,#pgIn,#pgPrev,#pgNext,#batesBtn,#ocrBtn,#findBtn,#sendBtn,#printBtn';
 let orgIO = null;
@@ -139,9 +140,9 @@ async function extractPages(uids) {
     const pages = await out.copyPages(src, idx); pages.forEach(pg => out.addPage(pg));
     const data = await out.save({ useObjectStreams: false });
     const name = (S.name.replace(/\.pdf$/i, '') || 'document') + '-pages-' + toRanges(idx).replace(/,\s*/g, '_') + '.pdf';
-    if (typeof window.pdfviewSaveHook === 'function') await window.pdfviewSaveHook({ filename: name, bytes: data });
-    else { const a = el('a', { href: URL.createObjectURL(new Blob([data], { type: 'application/pdf' })), download: name }); document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); }
-    toast(`Saved ${plural(idx.length, 'page')} as ${name}.`);
+    const r = await writeOut(data, { name, as: true, adopt: false });
+    if (!r.ok) { toast('Extract cancelled.'); return; }
+    toast(`Saved ${plural(idx.length, 'page')} as ${r.name || name}.`);
   } catch (e) { console.error(e); toast('Those pages could not be extracted.'); }
 }
 function defaultPos() { if (!S.osel.size) return S.pages.length; let last = -1; S.pages.forEach((p, i) => { if (S.osel.has(p.uid)) last = i; }); return last + 1; }

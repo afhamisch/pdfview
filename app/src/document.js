@@ -37,6 +37,12 @@ export async function prepare(bytes) {
     }
   } catch { return { bytes, stale: true }; }
   data.pages.forEach(e => { const i = e._arr.indexOf(e._ref); if (i != null && i >= 0) e._arr.remove(i); doc.context.delete(e._ref); });
+  // notes were written as real comment annotations; they come back as editable objects and are written again on save
+  for (const o of data.objects || []) {
+    if (!o.annotRef) continue;
+    try { const annots = doc.getPage(o.page).node.Annots(); if (annots) for (let i = annots.size() - 1; i >= 0; i--) { const r = annots.get(i); if (r instanceof PDFRef && r.objectNumber === o.annotRef[0] && r.generationNumber === o.annotRef[1]) { annots.remove(i); doc.context.delete(r); } } } catch {}
+    delete o.annotRef;
+  }
   doc.catalog.delete(PDFName.of(EDIT_KEY));
   return { bytes: await doc.save({ updateFieldAppearances: false }), objects: data.objects || [], bates: data.bates || null };
 }
@@ -55,7 +61,7 @@ export async function loadDoc(bytes) {
 }
 
 const mark = n => { try { performance.mark('pdfview:' + n); } catch {} };
-export async function openBytes(bytes, name, { sample = false, quiet = false } = {}) {
+export async function openBytes(bytes, name, { sample = false, quiet = false, file = null } = {}) {
   { const why = busyNow(); if (why) { toast(why); return false; } }
   mark('open-start');
   const prep = await prepare(bytes); bytes = prep.bytes; mark('prepared');
@@ -63,7 +69,7 @@ export async function openBytes(bytes, name, { sample = false, quiet = false } =
   if (!r.doc) { console.error(r.error); toast(r.needsPw ? 'This PDF is password protected. Remove the password, then open it here.' : 'That file could not be opened as a PDF.'); return false; }
   const { doc } = r;
   if (S.doc) stashTab(); S.tab = newTab();
-  Object.assign(S, { doc, bytes, name, sample, pages: [], reg: new Map(), sources: new Map([[0, { id: 0, name, bytes, doc }]]), objects: [], sel: null, editing: null, undo: [], dirty: false, fit: 'width', org: false, osel: new Set(), anchor: null, bates: prep.bates || null, meta: {}, formDirty: new Set(), lifts: [], lib: null, hover: null, lifting: false });
+  Object.assign(S, { doc, bytes, name, sample, pages: [], reg: new Map(), sources: new Map([[0, { id: 0, name, bytes, doc }]]), objects: [], sel: null, editing: null, undo: [], dirty: false, fit: 'width', org: false, osel: new Set(), anchor: null, bates: prep.bates || null, meta: {}, formDirty: new Set(), lifts: [], lib: null, hover: null, lifting: false, file });
   const proxies = await Promise.all(Array.from({ length: doc.numPages }, (_, i) => doc.getPage(i + 1)));
   proxies.forEach((proxy, i) => S.pages.push(newPage(0, i, proxy))); mark('pages');
   S.objects = (prep.objects || []).filter(o => o.page >= 0 && o.page < doc.numPages).map(o => Object.assign({}, o, { id: nextUid(), page: S.pages[o.page].uid }));
@@ -80,7 +86,7 @@ export async function openBytes(bytes, name, { sample = false, quiet = false } =
   return true;
 }
 export function blankDoc() {
-  Object.assign(S, { doc: null, bytes: null, name: '', sample: false, pages: [], reg: new Map(), sources: new Map(), objects: [], sel: null, editing: null, undo: [], dirty: false, org: false, osel: new Set(), anchor: null, bates: null, meta: {}, formDirty: new Set(), lifts: [], lib: null, hover: null, lifting: false });
+  Object.assign(S, { doc: null, bytes: null, name: '', sample: false, pages: [], reg: new Map(), sources: new Map(), objects: [], sel: null, editing: null, undo: [], dirty: false, org: false, osel: new Set(), anchor: null, bates: null, meta: {}, formDirty: new Set(), lifts: [], lib: null, hover: null, lifting: false, file: null });
 }
 export async function readFile(file) {
   if (!file) return;

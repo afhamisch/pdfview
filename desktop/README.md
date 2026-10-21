@@ -37,7 +37,10 @@ file while the app is running opens in the same window.
   (`pending_files`), reads them (`read_file`) and opens the first one;
 - `open-files` events arrive when another PDF is double-clicked while the app
   is running (single-instance plugin);
-- Save calls `save_file` with the PDF bytes as a binary IPC body and the
+- Open shows the native file dialog (`open_files`) so the app knows each
+  file's path; Save then writes the file in place (`write_file`), while Save
+  as goes through the dialog and returns the chosen path;
+- Save as calls `save_file` with the PDF bytes as a binary IPC body and the
   suggested name in a header; the wrapper shows a native Save dialog and
   writes the file.
 

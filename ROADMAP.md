@@ -21,6 +21,10 @@ Viewer
 
 Editor
 - tabs: several PDFs open at once, each with its own state
+- save in place (desktop, Chrome, Edge) and Save as; redacted copies always
+  get a new name
+- notes saved as comment annotations; existing comments listed in the sidebar
+- document properties: view, edit title/author/subject/keywords, strip all
 - edit existing text: a block lifts off the page as a text object (the
   drawing operators come out of the content stream, position and spacing
   kept, font matched to a bundled lookalike); scans and text in graphics

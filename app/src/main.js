@@ -14,6 +14,8 @@ import { makeSample } from './sample.js';
 import { ctxHooks, keyHooks } from './hooks.js';
 import { initDesktop } from './desktop.js';
 import { initFonts } from './fonts.js';
+import { pickFiles, openFromHandle, handlesFromDrop } from './fileio.js';
+import { initInfo } from './info.js';
 
 /* theme: 'system' (default), 'light' or 'dark'; Jonathan's palette follows the OS unless overridden */
 const THEME_KEY = 'pdfview.theme', THEMES = ['system', 'light', 'dark'];
@@ -48,13 +50,13 @@ function renderTabs() {
   const cur = host.querySelector('.tab[aria-selected="true"]'); if (cur && cur.scrollIntoView) { try { cur.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch {} }
 }
 export function setEnabled(onOff) {
-  $$('#tools .tb,#zoomIn,#zoomOut,#zoomFit,#pgIn,#pgPrev,#pgNext,#saveBtn,#orgBtn,#batesBtn,#ocrBtn,#printBtn,#sendBtn,#findBtn').forEach(b => b.disabled = !onOff);
+  $$('#tools .tb,#zoomIn,#zoomOut,#zoomFit,#pgIn,#pgPrev,#pgNext,#saveBtn,#saveAsBtn,#orgBtn,#batesBtn,#ocrBtn,#infoBtn,#printBtn,#sendBtn,#findBtn').forEach(b => b.disabled = !onOff);
   $('#undoBtn').disabled = !onOff || !S.undo.length;
   if (!onOff) { $('#zoomPct').textContent = '100%'; $('#pgIn').value = ''; $('#pgOf').textContent = 'of 0'; }
 }
 export function showRest() {
   $('#pages').innerHTML = REST;
-  $('#restOpen').addEventListener('click', () => $('#fileIn').click());
+  $('#restOpen').addEventListener('click', pickFiles);
   $('#restSample').addEventListener('click', loadSample);
   renderTabs(); setEnabled(false); $('#dirtyDot').hidden = true; emit('ctx');
 }
@@ -76,6 +78,7 @@ const HINT = {
   text: 'Click on the page where the text should start.', stamp: 'Pick a stamp, then click on the page to place it. Double-click a placed stamp to change its wording.', check: 'Click on the page to place a check mark.', sign: 'Click on the page to place your signature.',
   highlight: 'Drag across text to highlight it, or drag a box over anything.', draw: 'Draw freehand with the marker or pen.', shape: 'Drag on the page to draw the shape.', erase: 'Drag over the part you want gone; it is painted white, like correction fluid.', snap: 'Drag a box around the part of the page you want; it is copied as an image, with buttons for the text or a PNG file.', whiteout: 'Drag a white box over anything you want to cover.',
   redact: 'Drag a black box over anything you want to redact. When you save, everything under the boxes is permanently removed from the file.',
+  note: 'Click on the page to place a note. It is saved as a comment that Adobe and other viewers show.',
   field: 'Click on the page to place the field for the selected signer.'
 };
 on('ctx', () => {
@@ -86,21 +89,20 @@ on('ctx', () => {
 });
 
 /* ---------- wiring ---------- */
-$('#openBtn').addEventListener('click', () => $('#fileIn').click());
+$('#openBtn').addEventListener('click', pickFiles);
 async function openFiles(files) {
   let n = 0; for (const f of files) if (await readFile(f)) n++;
   if (n > 1) toast(`Opened ${n} files, one per tab. To combine files into one, use Organize and Insert.`);
 }
-$('#tabPlus').addEventListener('click', () => $('#fileIn').click());
+$('#tabPlus').addEventListener('click', pickFiles);
 $('#fileIn').addEventListener('change', e => { const files = [...e.target.files]; e.target.value = ''; if (files.length) openFiles(files); });
 $('#findBtn').addEventListener('click', openFind);
 let dragN = 0;
 addEventListener('dragenter', e => { if ([...(e.dataTransfer?.types || [])].includes('Files')) { dragN++; $('#dropHint').textContent = S.org ? 'Drop the PDF to insert its pages' : 'Drop the PDF to open it'; $('#dropHint').hidden = false; } });
 addEventListener('dragleave', () => { dragN = Math.max(0, dragN - 1); if (!dragN) $('#dropHint').hidden = true; });
 addEventListener('dragover', e => e.preventDefault());
-addEventListener('drop', e => { e.preventDefault(); dragN = 0; $('#dropHint').hidden = true; const fs = [...(e.dataTransfer?.files || [])]; if (!fs.length || anyModalOpen()) return; if (fs.length > 1 && !S.org) emit('drop:many', fs); else emit('drop', fs[0]); });
-on('drop', f => { if (!S.org) readFile(f); });
-on('drop:many', files => { if (S.org || !files.length) return; openFiles(files); });
+addEventListener('drop', e => { e.preventDefault(); dragN = 0; $('#dropHint').hidden = true; const fs = [...(e.dataTransfer?.files || [])]; if (!fs.length || anyModalOpen()) return; if (S.org) { emit('drop', fs[0]); return; } openDropped(fs, handlesFromDrop(e.dataTransfer)); });
+async function openDropped(files, hs) { let n = 0; for (let i = 0; i < files.length; i++) { let h = null; try { h = await hs[i]; } catch {} if (h && h.kind === 'file' ? await openFromHandle(h) : await readFile(files[i])) n++; } if (n > 1) toast(`Opened ${n} files, one per tab. To combine files into one, use Organize and Insert.`); }
 addEventListener('beforeunload', e => { if (anyDirty()) { e.preventDefault(); e.returnValue = ''; } });
 
 addEventListener('keydown', e => {
@@ -118,7 +120,7 @@ addEventListener('keydown', e => {
 
 setHooks({ afterTextLayer: p => applyHighlights(p) });
 import('./ocr.js').then(m => setHooks({ ocrLayer: m.renderOcrLayer }));
-initViewer(); initSearch(); initSidebar();
+initViewer(); initSearch(); initSidebar(); initInfo();
 const mods = await Promise.all([import('./editor.js'), import('./organize.js'), import('./bates.js'), import('./save.js'), import('./sign/index.js'), import('./ocr.js')].map(p => p.catch(e => { console.warn('module', e); return null; })));
 for (const m of mods) if (m && m.init) m.init();
 await Promise.all([pdfjs(), initFonts()]);

@@ -51,6 +51,16 @@ saved copy as invisible text so Acrobat, Edge and e-filing portals can search
 it too. Available in the served app and the desktop wrapper (the engine files
 are about 15 MB and are not inlined into the single offline file).
 
+Save writes back to the file you opened when it can (the desktop app, and
+Chrome or Edge when the file came in through the Open button or a drop);
+Save as asks for a name and place; a redacted copy always gets a new name so
+the original survives; other browsers download a copy. Notes: the Note tool
+places a sticky note that is saved as a real comment annotation, so Adobe and
+other viewers show it, and comments already in a file are listed with yours
+under Notes in the sidebar. Info shows the document properties (size, page
+size, version, dates, creator, fonts, attachments) and lets you change the
+title, author, subject and keywords, or strip all metadata on save.
+
 Several PDFs open at once, one per tab: each keeps its pages, placed items,
 typed form values, undo history and scroll position. Ctrl+] and Ctrl+[ switch
 tabs; in the desktop app Ctrl+PageDown, Ctrl+PageUp, Ctrl+Tab and Ctrl+W work
