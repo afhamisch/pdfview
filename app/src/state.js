@@ -12,10 +12,12 @@ export const S = {
   bates: null,           // { prefix, start, pad, corner, size } or null
   meta: {},              // misc: outline, title
   saving: false,         // a save or print is building the file: tabs stay put until it is done
+  file: null,            // where the active document came from: { kind: 'path', path } (desktop) or { kind: 'handle', handle } (Chrome), else null
+  author: (() => { try { return localStorage.getItem('pdfview.author') || ''; } catch { return ''; } })(), noteColor: '#ffd400',
   tabs: [], tab: null    // open documents (see tabs.js); the fields in DOC_KEYS belong to the active tab
 };
 // Everything that belongs to one open document rather than to the app.
-export const DOC_KEYS = ['doc', 'bytes', 'name', 'sample', 'sources', 'pages', 'reg', 'scale', 'fit', 'objects', 'sel', 'editing', 'undo', 'dirty', 'bates', 'meta', 'formDirty', 'lifts', 'lib', 'hover', 'lifting', 'org', 'osel', 'anchor', 'orgReturn', 'snap'];
+export const DOC_KEYS = ['doc', 'bytes', 'name', 'sample', 'sources', 'pages', 'reg', 'scale', 'fit', 'objects', 'sel', 'editing', 'undo', 'dirty', 'bates', 'meta', 'formDirty', 'lifts', 'lib', 'hover', 'lifting', 'org', 'osel', 'anchor', 'orgReturn', 'snap', 'file'];
 export const bus = new EventTarget();
 export const emit = (type, detail) => bus.dispatchEvent(new CustomEvent(type, { detail }));
 export const on = (type, fn) => bus.addEventListener(type, e => fn(e.detail));

@@ -1,6 +1,7 @@
 // Saving: form values come out of pdf.js (saveDocument), then pdf-lib applies added objects, page
 // order and rotation, Bates numbers, redactions and the editable layer, and drops unreferenced objects.
-import { PDFDocument, PDFName, PDFDict, PDFArray, PDFRef, PDFStream, PDFHexString, PDFTextField, PDFCheckBox, StandardFonts, rgb, degrees, BlendMode, LineCapStyle } from 'pdf-lib';
+import { PDFDocument, PDFName, PDFDict, PDFArray, PDFRef, PDFStream, PDFHexString, PDFString, PDFTextField, PDFCheckBox, StandardFonts, rgb, degrees, BlendMode, LineCapStyle } from 'pdf-lib';
+import { writeOut } from './fileio.js';
 import { pdfjsLib as lib, docOptions } from './pdfjs.js';
 import { S, on, emit, coveredWords } from './state.js';
 import { offset, rotOf } from './geometry.js';
@@ -13,6 +14,19 @@ import { embedCustom } from './fonts.js';
 import { keyHooks } from './hooks.js';
 
 const PN = k => PDFName.of(k);
+/* A note becomes a real comment annotation (Text, the sticky-note kind) so other viewers show it. */
+function addNote(doc, page, o) {
+  const pts = [[0, 0], [o.w, 0], [o.w, o.h], [0, o.h]].map(([u, v]) => offset([o.x, o.y], o.a, u, v)), xs = pts.map(q => q[0]), ys = pts.map(q => q[1]);
+  const c = hexRgb(o.color || '#ffd400'), created = o.created ? new Date(o.created) : new Date();
+  const dict = doc.context.obj({ Type: PN('Annot'), Subtype: PN('Text'), Rect: [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)], Contents: PDFHexString.fromText(o.text || ''), T: PDFHexString.fromText(o.author || ''), M: PDFString.fromDate(new Date()), CreationDate: PDFString.fromDate(isNaN(created) ? new Date() : created), C: [c.red, c.green, c.blue], CA: 1, Name: PN('Comment'), F: 28, Open: false, P: page.ref });
+  const ref = doc.context.register(dict); page.node.addAnnot(ref); return ref;
+}
+const INFO_KEYS = ['Title', 'Author', 'Subject', 'Keywords', 'Creator', 'Producer', 'CreationDate', 'ModDate', 'Trapped'];
+function applyMetadata(doc) {
+  if (S.meta.strip) { try { const info = doc.context.lookup(doc.context.trailerInfo.Info); if (info instanceof PDFDict) INFO_KEYS.forEach(k => info.delete(PN(k))); } catch {} doc.catalog.delete(PN('Metadata')); return; }
+  const e = S.meta.edits; if (!e) return;
+  try { if (e.title != null) doc.setTitle(e.title); if (e.author != null) doc.setAuthor(e.author); if (e.subject != null) doc.setSubject(e.subject); if (e.keywords != null) doc.setKeywords(String(e.keywords).split(/[,;]\s*/).filter(Boolean)); } catch (err) { console.warn('metadata', err); }
+}
 const hexRgb = h => { const n = parseInt(h.slice(1), 16); return rgb((n >> 16 & 255) / 255, (n >> 8 & 255) / 255, (n & 255) / 255); };
 function clean(str, font) { let out = ''; for (const ch of String(str).replace(/\t/g, '    ')) { if (ch === '\n') { out += ch; continue; } try { font.widthOfTextAtSize(ch, 10); out += ch; } catch { out += '?'; } } return out; }
 
@@ -93,7 +107,7 @@ export async function buildPdf({ editLayer = true } = {}) {
     }
     return fontCache.get(key);
   };
-  const flatten = $('#flatten').checked;
+  const flatten = $('#flatten').checked; applyMetadata(doc);
   const keptMain = new Set(S.pages.filter(p => p.src === 0).map(p => p.si));
   let form = null; try { form = doc.getForm(); } catch {}
   if (form && form.getFields().length) {
@@ -190,7 +204,7 @@ export async function buildPdf({ editLayer = true } = {}) {
           }
         });
       }
-      if (!isRed) { const c = Object.assign({}, o, { page: idx }); delete c.id; kept.push(c); }
+      if (!isRed) { const c = Object.assign({}, o, { page: idx }); delete c.id; delete c.fresh; if (o.type === 'note') { const r = addNote(doc, page, o); c.annotRef = [r.objectNumber, r.generationNumber]; } kept.push(c); }
     }
     if (bx) { const b = offset([bx.x, bx.y], bx.a, 0, bx.size * 0.8); page.drawText(bx.label, { x: b[0], y: b[1], size: bx.size, font: helv, color: rgb(0, 0, 0), rotate: degrees(bx.a) }); }
     if (isRed) continue;
@@ -206,20 +220,27 @@ export async function buildPdf({ editLayer = true } = {}) {
   // object streams are off so the editable-layer marker stays visible to the quick check on reopen
   return { bytes: await doc.save({ updateFieldAppearances: false, useObjectStreams: false }), redacted: redIdx.length };
 }
-export function outputName(redacted) { return (S.name.replace(/\.pdf$/i, '') || 'document') + (redacted ? '-redacted.pdf' : '-edited.pdf'); }
+export function outputName(redacted, download) { const base = S.name.replace(/\.pdf$/i, '') || 'document'; return base + (redacted ? '-redacted.pdf' : download ? '-edited.pdf' : '.pdf'); }
 let busy = false;
-export async function save(confirmed) {
+let asPending = false;
+export async function save(confirmed, as = false) {
   if (!S.doc || busy) return;
+  if (confirmed === true) as = as || asPending; asPending = false;
   if (document.activeElement?.blur) document.activeElement.blur();
   const rst = redStats();
-  if (rst.n && confirmed !== true) { $('#redLead').textContent = `${plural(rst.n, 'redaction')} on ${plural(rst.pages, 'page')} will be applied to the saved copy.`; $('#redModal').hidden = false; $('#redCancel').focus(); return; }
+  if (rst.n && confirmed !== true) { $('#redLead').textContent = `${plural(rst.n, 'redaction')} on ${plural(rst.pages, 'page')} will be applied to the saved copy.`; $('#redModal').hidden = false; $('#redCancel').focus(); asPending = as; return; }
   const btn = $('#saveBtn'); busy = true; S.saving = true; btn.disabled = true;
   try {
-    const { bytes, redacted } = await buildPdf(); const filename = outputName(redacted);
-    if (typeof window.pdfviewSaveHook === 'function') { const ok = await window.pdfviewSaveHook({ filename, bytes }); if (ok === false) { toast('Save cancelled.'); return; } }
-    else { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' })); a.download = filename; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); }
+    const { bytes, redacted } = await buildPdf();
+    // a redacted copy never overwrites the original; without a known location Save behaves like Save as
+    const forceAs = as || redacted || !S.file;
+    const willDownload = forceAs && !window.__TAURI__ && !(as && typeof window.showSaveFilePicker === 'function' && window.isSecureContext);
+    const r = await writeOut(bytes, { name: outputName(redacted, willDownload), as: forceAs, pick: as });
+    if (!r.ok) { toast('Save cancelled.'); return; }
+    if (r.name && r.name !== S.name && !r.download) { S.name = r.name; emit('tabs:changed'); }
     S.dirty = false; $('#dirtyDot').hidden = true; emit('dirty');
-    toast(redacted ? `Saved ${filename} with ${plural(rst.n, 'redaction')} applied.` : 'Saved ' + filename);
+    const filename = r.name || S.name;
+    toast(redacted ? `Saved ${filename} with ${plural(rst.n, 'redaction')} applied.` : r.download ? `Saved ${filename} to your downloads.` : `Saved ${filename}.`);
   } catch (e) { console.error(e); toast('This PDF could not be saved. It may be encrypted or damaged.'); }
   finally { busy = false; S.saving = false; btn.disabled = false; }
 }
@@ -237,11 +258,12 @@ export function init() {
   $('#printBtn').addEventListener('click', print);
   $('#redCancel').addEventListener('click', () => $('#redModal').hidden = true);
   $('#redGo').addEventListener('click', () => { $('#redModal').hidden = true; save(true); });
+  $('#saveAsBtn').addEventListener('click', () => save(undefined, true));
   $('#redModal').addEventListener('pointerdown', e => { if (e.target.id === 'redModal') $('#redModal').hidden = true; });
   on('form:change', src => { S.formDirty.add(src); markDirty(); });
   keyHooks.push((e, { mod }) => {
     if (!$('#redModal').hidden) { if (e.key === 'Escape') $('#redModal').hidden = true; return true; }
-    if (mod && e.key.toLowerCase() === 's' && S.doc) { e.preventDefault(); save(); return true; }
+    if (mod && e.key.toLowerCase() === 's' && S.doc) { e.preventDefault(); save(undefined, e.shiftKey); return true; }
     if (mod && e.key.toLowerCase() === 'p' && S.doc) { e.preventDefault(); print(); return true; }
     return false;
   });

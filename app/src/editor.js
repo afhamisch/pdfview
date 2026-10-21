@@ -114,6 +114,21 @@ function objEl(p, o) {
   } else if (o.type === 'image') d.append(el('img', { src: o.src, alt: 'Signature', draggable: 'false' }));
   else if (o.type === 'check') d.innerHTML = `<svg viewBox="0 0 100 100" preserveAspectRatio="none"><polyline points="12,55 40,82 90,18" fill="none" stroke="${o.color}" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
   else if (o.type === 'field') d.append(el('span', { class: 'fl', text: fieldLabel(o) }));
+  else if (o.type === 'note') {
+    d.innerHTML = noteSvg(o.color); d.title = (o.text || '').slice(0, 200);
+    if (S.sel === o.id) {
+      const pop = el('div', { class: 'notepop' });
+      const author = el('input', { class: 'nauthor', type: 'text', value: o.author || '', placeholder: 'Your name', 'aria-label': 'Author' });
+      author.addEventListener('change', () => { o.author = author.value.trim(); S.author = o.author; try { localStorage.setItem('pdfview.author', o.author); } catch {} markDirty(); });
+      const ta = el('textarea', { class: 'ntext', placeholder: 'Type the note', 'aria-label': 'Note text', rows: '4' }); ta.value = o.text || '';
+      let pushed = false; ta.addEventListener('input', () => { if (!pushed) { pushUndo(); pushed = true; } o.text = ta.value; d.title = o.text.slice(0, 200); markDirty(); });
+      pop.addEventListener('pointerdown', ev => ev.stopPropagation()); pop.addEventListener('dblclick', ev => ev.stopPropagation());
+      pop.addEventListener('keydown', ev => { if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); select(null); } });
+      pop.append(el('div', { class: 'nhead' }, author, el('span', { class: 'ndate', text: o.created ? new Date(o.created).toLocaleDateString() : '' })), ta);
+      d.append(pop);
+      delete o.fresh; setTimeout(() => { if (d.isConnected && !d.contains(document.activeElement)) ta.focus(); }, 0);
+    }
+  }
   else if (o.type === 'shape') d.innerHTML = shapeSvg(o, S.scale);
   else if (o.type === 'ink') {
     d.classList.add(o.mode === 'marker' ? 'marker' : o.mode === 'erase' ? 'erase' : 'pen');
@@ -121,11 +136,16 @@ function objEl(p, o) {
     d.innerHTML = `<svg viewBox="0 0 ${o.w} ${o.h}" preserveAspectRatio="none"><polyline points="${pts}" fill="none" stroke="${o.color}" stroke-width="${o.width}" stroke-linecap="round" stroke-linejoin="round" opacity="${o.mode === 'marker' ? .42 : 1}" vector-effect="non-scaling-stroke" style="stroke-width:${o.width * S.scale}px"/></svg>`;
   }
   place(d, p, o);
-  if (S.sel === o.id && !o.box && o.type !== 'ink') { const h = el('div', { class: 'hdl', title: o.type === 'text' ? 'Drag to set the box width (text wraps inside it)' : 'Drag to resize' }); h.addEventListener('pointerdown', e => resizeDown(p, o, d, e)); d.append(h); }
+  if (S.sel === o.id && !o.box && o.type !== 'ink' && o.type !== 'note') { const h = el('div', { class: 'hdl', title: o.type === 'text' ? 'Drag to set the box width (text wraps inside it)' : 'Drag to resize' }); h.addEventListener('pointerdown', e => resizeDown(p, o, d, e)); d.append(h); }
   d.addEventListener('pointerdown', e => objDown(p, o, e));
   return d;
 }
-export function select(id) { S.sel = id; renderAllObjs(); emit('ctx'); }
+export function select(id) {
+  const prev = S.sel != null && S.sel !== id ? S.objects.find(x => x.id === S.sel) : null;
+  if (prev && prev.type === 'note' && !(prev.text || '').trim()) S.objects = S.objects.filter(x => x !== prev); // an empty note is dropped when left
+  S.sel = id; renderAllObjs(); emit('ctx');
+}
+const noteSvg = color => `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 4.5a1.5 1.5 0 0 1 1.5-1.5h14a1.5 1.5 0 0 1 1.5 1.5v10a1.5 1.5 0 0 1-1.5 1.5h-8.2L6 20.5V16H5a1.5 1.5 0 0 1-1.5-1.5z" fill="${color || '#ffd400'}" stroke="#6b5300" stroke-width="1.1"/><path d="M7.5 8h9M7.5 11.5h6" stroke="#6b5300" stroke-width="1.2" stroke-linecap="round"/></svg>`;
 const findEl = (p, o) => p.ol.querySelector(`[data-id="${o.id}"]`);
 function objDown(p, o, e) {
   if (e.button > 0) return; e.stopPropagation();
@@ -212,6 +232,10 @@ function sheetDown(p, e) {
   } else if (tool === 'stamp') {
     pushUndo(); const text = S.stamp || STAMPS[0], size = 14; const tl = offset(P, R, -(text.length * size * 0.33), -(size * 0.9));
     addObj(p, { type: 'text', box: true, x: tl[0], y: tl[1], a: R, text, size, color: S.tcolor === '#111111' ? '#b3261e' : S.tcolor });
+    setTool('select');
+  } else if (tool === 'note') {
+    pushUndo(); const z = 18, tl = offset(P, R, -z / 2, -z / 2);
+    addObj(p, { type: 'note', x: tl[0], y: tl[1], w: z, h: z, a: R, text: '', author: S.author || '', color: S.noteColor, created: new Date().toISOString(), fresh: true });
     setTool('select');
   } else if (tool === 'check') {
     pushUndo(); const z = 12, tl = offset(P, R, -z / 2, -z / 2);
@@ -405,8 +429,9 @@ function renderCtx(c) {
     }
     return false;
   }
-  c.append(el('span', { class: 'lbl', text: { text: o.box ? 'Stamp' : 'Text', check: 'Check mark', image: 'Signature', highlight: 'Highlight', whiteout: 'White-out', redact: 'Redaction', field: 'Signature field', ink: o.mode === 'marker' ? 'Marker stroke' : o.mode === 'erase' ? 'Eraser stroke' : 'Pen stroke', shape: { line: 'Line', arrow: 'Arrow', rect: 'Rectangle', ellipse: 'Ellipse' }[o.kind] }[o.type] }));
+  c.append(el('span', { class: 'lbl', text: { text: o.box ? 'Stamp' : 'Text', check: 'Check mark', image: 'Signature', highlight: 'Highlight', note: 'Note', whiteout: 'White-out', redact: 'Redaction', field: 'Signature field', ink: o.mode === 'marker' ? 'Marker stroke' : o.mode === 'erase' ? 'Eraser stroke' : 'Pen stroke', shape: { line: 'Line', arrow: 'Arrow', rect: 'Rectangle', ellipse: 'Ellipse' }[o.kind] }[o.type] }));
   if (o.type === 'redact') c.append(el('span', { text: 'Content under this box is permanently removed when you save.', style: { color: 'var(--redline)' } }));
+  if (o.type === 'note') { [['#ffd400', 'Yellow'], ['#8fd3ff', 'Blue'], ['#b6f2a1', 'Green'], ['#ffb3c7', 'Pink']].forEach(([hex, name]) => { const b = el('button', { class: 'sw', type: 'button', title: name, 'aria-label': name, 'aria-pressed': String(o.color === hex), style: { background: hex } }); b.addEventListener('pointerdown', e => e.preventDefault()); b.addEventListener('click', () => { pushUndo(); o.color = hex; S.noteColor = hex; renderObjs(PG(o.page)); markDirty(); emit('ctx'); }); c.append(b); }); c.append(el('span', { class: 'hint', text: 'Saved as a comment that Adobe and other viewers show. Drag the icon to move it.' })); }
   if (o.type === 'text' && !o.box) {
     textToolbar(c, o, { onChange: mut => { pushUndo(); mut(o); S.tsize = o.size; S.tcolor = o.color; const { font, bold, italic, underline, align, list } = o; S.textStyle = { font, bold, italic, underline, align, list }; const wasEditing = S.editing === o.id; renderObjs(PG(o.page)); markDirty(); emit('ctx'); if (wasEditing) startEdit(o); } });
     if (S.editing !== o.id) c.append(el('button', { class: 'mini', type: 'button', text: 'Edit text', onclick: () => startEdit(o) }));
@@ -456,6 +481,7 @@ export function init() {
   $('#pages').addEventListener('pointermove', hoverMove); $('#pages').addEventListener('pointerleave', clearHover);
   on('doc:open', () => { setTool('select'); clearHover(); $('#undoBtn').disabled = true; $('#flatten').disabled = false; });
   on('tab:switch', () => { setTool('select'); clearHover(); $('#undoBtn').disabled = !S.undo.length; $('#flatten').disabled = false; renderAllObjs(); });
+  on('select:obj', id => { if (S.objects.some(o => o.id === id)) select(id); });
   on('doc:close', () => { setTool('select'); $('#flatten').disabled = true; $('#flatten').checked = false; });
   keyHooks.push((e, { typing, mod }) => {
     if (anyModalOpen() || S.mode === 'sign') return false;
@@ -464,7 +490,7 @@ export function init() {
     if ((e.key === 'Delete' || e.key === 'Backspace') && S.sel != null) { e.preventDefault(); removeSel(); return true; }
     if (e.key === 'Escape') { if (S.sel != null) select(null); else setTool('select'); return true; }
     if (mod || e.altKey) return false;
-    const k = { v: 'select', t: 'text', m: 'stamp', k: 'check', s: 'sign', h: 'highlight', d: 'draw', a: 'shape', e: 'erase', w: 'whiteout', r: 'redact', n: 'snap' }[e.key.toLowerCase()];
+    const k = { v: 'select', t: 'text', m: 'stamp', k: 'check', s: 'sign', h: 'highlight', c: 'note', d: 'draw', a: 'shape', e: 'erase', w: 'whiteout', r: 'redact', n: 'snap' }[e.key.toLowerCase()];
     if (k && S.doc) { if ((k === 'highlight' || k === 'whiteout' || k === 'redact') && markSelection(k)) return true; setTool(k); return true; }
     return false;
   });
