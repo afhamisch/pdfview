@@ -1,6 +1,6 @@
 // Document properties: what the file says about itself, with the fields you can change and a switch
 // to strip them all on save.
-import { S, emit, on } from './state.js';
+import { S, on } from './state.js';
 import { pdfjsLib as lib } from './pdfjs.js';
 import { $, el, toast, plural } from './ui.js';
 import { libDoc } from './document.js';
@@ -74,4 +74,3 @@ export function initInfo() {
   keyHooks.push(e => { if (modal && e.key === 'Escape') { closeInfo(); return true; } return false; });
   on('doc:close', closeInfo); on('tab:switch', closeInfo);
 }
-export { emit };

@@ -2,9 +2,9 @@
 //   desktop wrapper (Tauri): native dialogs, paths, Save writes the opened file in place;
 //   Chrome and Edge (File System Access API): a picker hands over a file handle, Save writes it in place;
 //   any other browser: the file input to open, a download to save.
-import { S, emit } from './state.js';
+import { S } from './state.js';
 import { openBytes } from './document.js';
-import { $, toast, plural } from './ui.js';
+import { $, toast } from './ui.js';
 
 const T = () => window.__TAURI__;
 export const isDesktop = () => !!(T() && T().core && T().core.invoke);
@@ -38,8 +38,9 @@ export async function pickFiles() {
 }
 /* Dropped files: Chrome can hand over handles so Save writes them in place. Call synchronously in the drop handler. */
 export function handlesFromDrop(dt) {
-  const items = [...((dt && dt.items) || [])];
-  return items.map(it => it.kind === 'file' && typeof it.getAsFileSystemHandle === 'function' ? it.getAsFileSystemHandle().catch(() => null) : Promise.resolve(null));
+  // only file items, so the list lines up with dataTransfer.files (drags often carry a text item too)
+  const items = [...((dt && dt.items) || [])].filter(it => it.kind === 'file');
+  return items.map(it => typeof it.getAsFileSystemHandle === 'function' ? it.getAsFileSystemHandle().catch(() => null) : Promise.resolve(null));
 }
 
 function download(bytes, name) {
@@ -79,8 +80,3 @@ export async function writeOut(bytes, { name, as = false, pick = false, adopt = 
   }
   download(bytes, name); return { ok: true, name, download: true };
 }
-export function fileLabel() {
-  if (!S.file) return hasFsAccess() || isDesktop() ? 'Opened without a location: Save asks where to put it.' : '';
-  return S.file.kind === 'path' ? S.file.path : 'Save writes back to the opened file.';
-}
-export { plural, emit };
