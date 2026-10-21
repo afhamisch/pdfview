@@ -24,8 +24,15 @@ jobs:
       - run: npm run build:desktop
       - run: npx tauri icon icon.png
         working-directory: desktop
-      - run: npx tauri build
+      # With the signing key the build also writes the .sig files the updater needs; without it the
+      # updater artifacts are switched off so the installer still gets built.
+      - shell: bash
         working-directory: desktop
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          if [ -n "$TAURI_SIGNING_PRIVATE_KEY" ]; then npx tauri build; else npx tauri build --config '{"bundle":{"createUpdaterArtifacts":false}}'; fi
       - uses: actions/upload-artifact@v4
         with:
           name: PDFView-windows
