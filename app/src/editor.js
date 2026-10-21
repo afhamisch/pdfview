@@ -15,15 +15,27 @@ import { FONTS, PAD, LINE, baselineAt } from './textstyle.js';
 
 export function markDirty() { const was = S.dirty; S.dirty = true; $('#dirtyDot').hidden = false; if (!was) emit('dirty'); }
 export function snapshot() { return JSON.stringify({ o: S.objects, p: S.pages.map(p => [p.uid, p.rot]), b: S.bates, l: S.lifts.length }); }
-export function pushUndo() { S.undo.push(snapshot()); if (S.undo.length > 150) S.undo.shift(); $('#undoBtn').disabled = false; }
+export function syncUndo() { $('#undoBtn').disabled = !S.undo.length; $('#redoBtn').disabled = !S.redo.length; }
+export function pushUndo() { S.undo.push(snapshot()); if (S.undo.length > 150) S.undo.shift(); S.redo = []; syncUndo(); }
 export function undo() {
   if (!S.undo.length) return;
+  const raw = S.undo.pop(), st = JSON.parse(raw);
+  // a lift (text taken off the page) is not replayable, so redo is cleared when one is undone
+  if (S.lifts.length > (st.l || 0)) S.redo = []; else S.redo.push(snapshot());
+  applySnapshot(st);
+}
+export function redo() {
+  if (!S.redo.length) return;
+  const st = JSON.parse(S.redo.pop()); S.undo.push(snapshot());
+  applySnapshot(st);
+}
+function applySnapshot(st) {
   if (document.activeElement?.blur) document.activeElement.blur();
-  const st = JSON.parse(S.undo.pop()); const before = S.pages.map(p => p.uid).join(',');
+  const before = S.pages.map(p => p.uid).join(',');
   S.objects = st.o; S.bates = st.b || null;
   S.pages = st.p.map(([u, r]) => { const p = PG(u); p.rot = r; return p; });
   const keep = new Set(S.pages.map(p => p.uid)); S.osel = new Set([...S.osel].filter(u => keep.has(u)));
-  S.sel = null; S.editing = null; $('#undoBtn').disabled = !S.undo.length; markDirty();
+  S.sel = null; S.editing = null; syncUndo(); markDirty();
   S.pages.forEach(p => { if (p.ocr) emit('ocr:refresh', p); });
   if (S.org) emit('org:render');
   else if (before !== S.pages.map(p => p.uid).join(',')) { buildPages(); emit('pages:changed'); }
@@ -255,7 +267,7 @@ function sheetDown(p, e) {
     const pts = [P]; const svg = el('div', { class: 'obj obj-ink ghost ' + mode }); p.ol.append(svg);
     const draw = () => { const xs = pts.map(q => q[0]), ys = pts.map(q => q[1]); const x0 = Math.min(...xs) - width, x1 = Math.max(...xs) + width, y0 = Math.min(...ys) - width, y1 = Math.max(...ys) + width; const o = { x: x0, y: y1, w: x1 - x0, h: y1 - y0, a: 0 }; place(svg, p, o); svg.innerHTML = `<svg viewBox="0 0 ${o.w} ${o.h}" preserveAspectRatio="none"><polyline points="${pts.map(([x, y]) => `${x - x0},${y1 - y}`).join(' ')}" fill="none" stroke="${color}" stroke-width="${width}" stroke-linecap="round" stroke-linejoin="round" opacity="${mode === 'marker' ? .42 : 1}" vector-effect="non-scaling-stroke" style="stroke-width:${width * S.scale}px"/></svg>`; };
     draw();
-    const mv = ev => { const q = toWorld(p, ev); const l = pts[pts.length - 1]; if (Math.hypot(q[0] - l[0], q[1] - l[1]) < 1.2) return; pts.push(q); draw(); };
+    const mv = ev => { const q = toWorld(p, ev); if (ev.shiftKey) { pts.length = 1; pts.push(q); draw(); return; } const l = pts[pts.length - 1]; if (Math.hypot(q[0] - l[0], q[1] - l[1]) < 1.2) return; pts.push(q); draw(); };
     const up = () => {
       removeEventListener('pointermove', mv); removeEventListener('pointerup', up); removeEventListener('pointercancel', up); svg.remove();
       if (pts.length < 2) pts.push([P[0] + 0.5, P[1]]);
@@ -267,7 +279,9 @@ function sheetDown(p, e) {
     const g = el('div', { class: 'obj obj-shape ghost' }); p.ol.append(g);
     const kind = S.shape.kind, width = S.shape.width, color = S.shape.color;
     let r = rectFrom(P, P, R), dir = [0, 0, 1, 1];
-    const upd = ev => { const E = toWorld(p, ev); r = rectFrom(P, E, R); const { c, s } = frame(R); const u = (E[0] - P[0]) * c + (E[1] - P[1]) * s, v = (E[0] - P[0]) * s - (E[1] - P[1]) * c; dir = u < 0 ? [1, v < 0 ? 1 : 0, 0, v < 0 ? 0 : 1] : [0, v < 0 ? 1 : 0, 1, v < 0 ? 0 : 1]; const o = Object.assign({ kind, width, color, dir }, r); place(g, p, o); g.innerHTML = shapeSvg(o, S.scale); };
+    const upd = ev => { let E = toWorld(p, ev); const { c, s } = frame(R); let u = (E[0] - P[0]) * c + (E[1] - P[1]) * s, v = (E[0] - P[0]) * s - (E[1] - P[1]) * c;
+      if (ev.shiftKey) { if (kind === 'line' || kind === 'arrow') { const len = Math.hypot(u, v), ang = Math.round(Math.atan2(v, u) / (Math.PI / 4)) * (Math.PI / 4); u = len * Math.cos(ang); v = len * Math.sin(ang); if (Math.abs(u) < 1e-6) u = 0; if (Math.abs(v) < 1e-6) v = 0; } else { const m = Math.max(Math.abs(u), Math.abs(v)); u = Math.sign(u || 1) * m; v = Math.sign(v || 1) * m; } E = offset(P, R, u, v); }
+      r = rectFrom(P, E, R); dir = u < 0 ? [1, v < 0 ? 1 : 0, 0, v < 0 ? 0 : 1] : [0, v < 0 ? 1 : 0, 1, v < 0 ? 0 : 1]; const o = Object.assign({ kind, width, color, dir }, r); place(g, p, o); g.innerHTML = shapeSvg(o, S.scale); };
     const mv = ev => upd(ev);
     const up = ev => {
       removeEventListener('pointermove', mv); removeEventListener('pointerup', up); removeEventListener('pointercancel', up); g.remove();
@@ -407,7 +421,7 @@ function renderCtx(c) {
       const kind = el('select', { class: 'ctl', id: 'shapeKind', 'aria-label': 'Shape' }); [['line', 'Line'], ['arrow', 'Arrow'], ['rect', 'Rectangle'], ['ellipse', 'Circle or ellipse']].forEach(([v, t]) => kind.append(el('option', { value: v, text: t }))); kind.value = S.shape.kind; kind.addEventListener('change', () => { S.shape.kind = kind.value; });
       const width = el('select', { class: 'ctl', 'aria-label': 'Line thickness' }); [[1, 'Hairline'], [2, 'Thin'], [3, 'Medium'], [5, 'Thick']].forEach(([v, t]) => width.append(el('option', { value: v, text: t }))); width.value = S.shape.width; width.addEventListener('change', () => { S.shape.width = +width.value; });
       c.append(kind, width); COLORS.forEach(([hex, name]) => { const b = el('button', { class: 'sw', type: 'button', title: name, 'aria-label': name, 'aria-pressed': String(S.shape.color === hex), style: { background: hex } }); b.addEventListener('click', () => { S.shape.color = hex; emit('ctx'); }); c.append(b); });
-      const pick = el('input', { type: 'color', class: 'colorpick', value: S.shape.color, title: 'Any color' }); pick.addEventListener('change', () => { S.shape.color = pick.value; emit('ctx'); }); c.append(pick, el('span', { text: 'Drag on the page to draw it. Shapes can be moved and resized afterwards.' })); return true;
+      const pick = el('input', { type: 'color', class: 'colorpick', value: S.shape.color, title: 'Any color' }); pick.addEventListener('change', () => { S.shape.color = pick.value; emit('ctx'); }); c.append(pick, el('span', { text: 'Hold Shift for a straight or square shape. Drag on the page to draw it. Shapes can be moved and resized afterwards.' })); return true;
     }
     if (S.tool === 'erase') {
       c.append(el('span', { class: 'lbl', text: 'Eraser' }));
@@ -477,15 +491,16 @@ export function init() {
     if ((t === 'highlight' || t === 'whiteout' || t === 'redact') && markSelection(t)) return;
     setTool(t);
   }));
-  $('#undoBtn').addEventListener('click', undo);
+  $('#undoBtn').addEventListener('click', undo); $('#redoBtn').addEventListener('click', redo);
   $('#pages').addEventListener('pointermove', hoverMove); $('#pages').addEventListener('pointerleave', clearHover);
-  on('doc:open', () => { setTool('select'); clearHover(); $('#undoBtn').disabled = true; $('#flatten').disabled = false; });
-  on('tab:switch', () => { setTool('select'); clearHover(); $('#undoBtn').disabled = !S.undo.length; $('#flatten').disabled = false; renderAllObjs(); });
+  on('doc:open', () => { setTool('select'); clearHover(); syncUndo(); $('#flatten').disabled = false; });
+  on('tab:switch', () => { setTool('select'); clearHover(); syncUndo(); $('#flatten').disabled = false; renderAllObjs(); });
   on('select:obj', id => { if (S.objects.some(o => o.id === id)) select(id); });
   on('doc:close', () => { setTool('select'); $('#flatten').disabled = true; $('#flatten').checked = false; });
   keyHooks.push((e, { typing, mod }) => {
     if (anyModalOpen() || S.mode === 'sign') return false;
-    if (mod && e.key.toLowerCase() === 'z' && !typing) { e.preventDefault(); undo(); return true; }
+    if (mod && e.key.toLowerCase() === 'z' && !typing) { e.preventDefault(); if (e.shiftKey) redo(); else undo(); return true; }
+    if (mod && e.key.toLowerCase() === 'y' && !typing) { e.preventDefault(); redo(); return true; }
     if (typing || S.org) return false;
     if ((e.key === 'Delete' || e.key === 'Backspace') && S.sel != null) { e.preventDefault(); removeSel(); return true; }
     if (e.key === 'Escape') { if (S.sel != null) select(null); else setTool('select'); return true; }

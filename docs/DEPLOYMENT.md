@@ -164,7 +164,20 @@ Goal: the installed app checks GitHub when it starts, downloads a newer
 build in the background, and installs it on the next restart. Nobody
 downloads installers by hand.
 
-Tauri 2 ships this as the updater plugin. The pieces:
+Status: built. The wrapper has the updater and process plugins, the public
+key and the release endpoint are in `tauri.conf.json`, the page checks for
+an update a few seconds after start and every four hours and shows a
+"Restart now" bar, and the `release` job in `.github/workflows/desktop.yml`
+publishes a signed GitHub Release on every merge to `main` with the version
+`0.2.<run number>`. The one thing it needs from a repository admin: the two
+secrets `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`
+(GitHub, the repository, Settings, Secrets and variables, Actions, New
+repository secret). Until they exist the release job stops early and the
+installer is only available as an Actions artifact. Copies installed before
+the updater existed must be replaced by hand once; from then on they update
+themselves.
+
+The pieces, for reference:
 
 ### 1. Signing keys (once)
 

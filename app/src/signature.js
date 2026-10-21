@@ -35,11 +35,32 @@ async function useSig() {
   finish(res);
 }
 export function initSignature() {
-  const c = sigC(); let drawing = false, last = null; const ctx = () => c.getContext('2d');
-  const pt = e => { const r = c.getBoundingClientRect(); return [(e.clientX - r.left) * 2, (e.clientY - r.top) * 2]; };
-  c.addEventListener('pointerdown', e => { drawing = true; last = pt(e); c.setPointerCapture(e.pointerId); const g = ctx(); g.fillStyle = '#1a2a5c'; g.beginPath(); g.arc(last[0], last[1], 2.6, 0, 7); g.fill(); sigInk = true; });
-  c.addEventListener('pointermove', e => { if (!drawing) return; const p = pt(e), g = ctx(); g.strokeStyle = '#1a2a5c'; g.lineWidth = 5.2; g.lineCap = 'round'; g.lineJoin = 'round'; g.beginPath(); g.moveTo(last[0], last[1]); g.lineTo(p[0], p[1]); g.stroke(); last = p; });
-  const end = () => { drawing = false; }; c.addEventListener('pointerup', end); c.addEventListener('pointercancel', end);
+  const c = sigC(); let drawing = false, last = null, mid = null, active = null, penSeen = false; const ctx = () => c.getContext('2d'), INK = '#1a2a5c';
+  const pt = e => { const r = c.getBoundingClientRect(); return [(e.clientX - r.left) * (c.width / r.width), (e.clientY - r.top) * (c.height / r.height)]; };
+  const widthFor = e => e.pointerType === 'pen' && e.pressure > 0 ? 2.4 + e.pressure * 5.6 : 5.2;
+  // one pointer at a time; while a pen is in use a resting palm (touch) is ignored; strokes are smoothed
+  // through the midpoints of the sampled points and use every coalesced sample the browser has
+  c.addEventListener('pointerdown', e => {
+    if (active != null) return;
+    if (e.pointerType === 'touch' && penSeen) return;
+    if (e.pointerType === 'pen') penSeen = true;
+    e.preventDefault(); active = e.pointerId; drawing = true; last = pt(e); mid = last;
+    try { c.setPointerCapture(e.pointerId); } catch {}
+    const g = ctx(); g.fillStyle = INK; g.beginPath(); g.arc(last[0], last[1], widthFor(e) / 2, 0, 7); g.fill(); sigInk = true;
+  });
+  c.addEventListener('pointermove', e => {
+    if (!drawing || e.pointerId !== active) return;
+    e.preventDefault();
+    const evs = (e.getCoalescedEvents && e.getCoalescedEvents()) || []; if (!evs.length) evs.push(e);
+    const g = ctx(); g.strokeStyle = INK; g.lineCap = 'round'; g.lineJoin = 'round';
+    for (const ev of evs) {
+      const p = pt(ev), m = [(last[0] + p[0]) / 2, (last[1] + p[1]) / 2];
+      g.lineWidth = widthFor(ev); g.beginPath(); g.moveTo(mid[0], mid[1]); g.quadraticCurveTo(last[0], last[1], m[0], m[1]); g.stroke();
+      last = p; mid = m;
+    }
+  });
+  const end = e => { if (e && active != null && e.pointerId !== active) return; if (drawing && last && mid) { const g = ctx(); g.strokeStyle = INK; g.lineCap = 'round'; g.beginPath(); g.moveTo(mid[0], mid[1]); g.lineTo(last[0], last[1]); g.stroke(); } drawing = false; active = null; };
+  c.addEventListener('pointerup', end); c.addEventListener('pointercancel', end); c.addEventListener('lostpointercapture', end);
   $$('[data-sigtab]').forEach(b => b.addEventListener('click', () => { setSigTab(b.dataset.sigtab); if (b.dataset.sigtab === 'draw') sizeSig(); }));
   $('#sigName').addEventListener('input', () => { $('#sigPrev').textContent = $('#sigName').value || ' '; });
   $('#sigName').addEventListener('keydown', e => { if (e.key === 'Enter') useSig(); });
