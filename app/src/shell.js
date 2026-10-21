@@ -7,7 +7,6 @@ export const SHELL = `
     <div class="brand">${ICON.open.replace('<svg', '<svg width="18" height="18"')}<span>PDFView</span></div>
     <button class="btn" id="openBtn" type="button">${ICON.open}Open</button>
     <input type="file" id="fileIn" accept="application/pdf,.pdf" multiple hidden><input type="file" id="insFile" accept="application/pdf,.pdf" hidden>
-    <div class="tabs" id="tabs" role="tablist" aria-label="Open files"></div>
     <div class="grp">
       <button class="tb" id="sideBtn" aria-pressed="false" title="Pages and bookmarks">${ICON.side}</button>
       <button class="tb" id="findBtn" title="Find (Ctrl+F)">${ICON.find}</button>
@@ -43,6 +42,7 @@ export const SHELL = `
     <label class="chk" title="Bakes form entries into the page so they can no longer be edited"><input type="checkbox" id="flatten" disabled><span>Flatten</span></label>
     <button class="btn primary" id="saveBtn" type="button" disabled>${ICON.save}Save<span class="dot" id="dirtyDot" hidden></span></button>
   </header>
+  <div class="tabbar" id="tabbar" hidden><div class="tabs" id="tabs" role="tablist" aria-label="Open files"></div><button class="tabplus" id="tabPlus" type="button" title="Open another PDF" aria-label="Open another PDF">${ICON.plus}</button></div>
   <div class="ctx" id="ctx"></div>
   <div class="body">
     <aside id="side" hidden>

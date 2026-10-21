@@ -28,12 +28,14 @@ document.body.dataset.tool = 'select';
 applyTheme(theme);
 $('#themeBtn').addEventListener('click', () => { theme = THEMES[(THEMES.indexOf(theme) + 1) % THEMES.length]; try { localStorage.setItem(THEME_KEY, theme); } catch {} applyTheme(theme); });
 
+const FILE_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2.5h8l5 5V21a.5.5 0 0 1-.5.5h-12A.5.5 0 0 1 6 21z"/><path d="M14 2.5v5h5"/><path d="M9 13h6M9 17h6"/></svg>';
 function renderTabs() {
-  const host = $('#tabs'); if (!host) return; host.innerHTML = '';
-  if (!S.tabs.length) { host.append(el('span', { class: 'nofile', text: 'No file' })); return; }
+  const host = $('#tabs'), bar = $('#tabbar'); if (!host) return; host.innerHTML = '';
+  if (bar) bar.hidden = !S.tabs.length;
+  if (!S.tabs.length) return;
   for (const t of S.tabs) {
     const active = t === S.tab, name = tabName(t) || 'document.pdf';
-    const b = el('div', { class: 'tab', role: 'tab', 'aria-selected': String(active), title: name + (tabDirty(t) ? ' (unsaved changes)' : ''), tabindex: '0', dataset: { tab: t.id } }, el('span', { class: 'nm', text: name }));
+    const b = el('div', { class: 'tab', role: 'tab', 'aria-selected': String(active), title: name + (tabDirty(t) ? ' (unsaved changes)' : ''), tabindex: '0', dataset: { tab: t.id } }, el('span', { class: 'ic', html: FILE_ICON }), el('span', { class: 'nm', text: name.replace(/\.pdf$/i, '') }));
     if (tabSample(t)) b.append(el('span', { class: 'tag', text: 'Sample' }));
     if (tabDirty(t)) b.append(el('span', { class: 'dot', title: 'Unsaved changes' }));
     const x = el('button', { class: 'x', type: 'button', title: 'Close', 'aria-label': 'Close ' + name, html: ICON.close });
@@ -89,6 +91,7 @@ async function openFiles(files) {
   let n = 0; for (const f of files) if (await readFile(f)) n++;
   if (n > 1) toast(`Opened ${n} files, one per tab. To combine files into one, use Organize and Insert.`);
 }
+$('#tabPlus').addEventListener('click', () => $('#fileIn').click());
 $('#fileIn').addEventListener('change', e => { const files = [...e.target.files]; e.target.value = ''; if (files.length) openFiles(files); });
 $('#findBtn').addEventListener('click', openFind);
 let dragN = 0;
