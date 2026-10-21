@@ -8,7 +8,7 @@ const logs = []; page.on('console', m => { if (!/willRead/.test(m.text())) logs.
 const out = {}; process.on('uncaughtException', e => { console.log('FAILED', e.message.split('\n')[0]); console.log(JSON.stringify(out, null, 1)); console.log(logs.join('\n')); process.exit(1); });
 const tabs = () => page.$$eval('#tabs .tab', es => es.map(e => ({ name: e.querySelector('.nm').textContent, active: e.getAttribute('aria-selected') === 'true', dirty: !!e.querySelector('.dot') })));
 await page.goto(url); await page.waitForSelector('body[data-ready]', { state: 'attached' });
-out.empty = await page.textContent('#tabs');
+out.empty = await page.$eval('#tabbar', e => e.hidden);
 await page.click('#restSample'); await page.waitForFunction(() => document.querySelectorAll('.annotationLayer input').length > 3);
 await page.fill('.annotationLayer input[type=text]', 'Tab one value');
 await page.click('[data-tool="check"]'); const b = await (await page.$('.sheet')).boundingBox(); await page.mouse.click(b.x + 300, b.y + 300); await page.waitForSelector('.obj-check');
@@ -37,6 +37,6 @@ out.dirtyTabs = await tabs();
 await page.click('#tabs .tab[aria-selected="true"] .x'); await page.waitForTimeout(200); out.firstCloseToast = await page.textContent('#toast'); out.stillOpen = (await tabs()).length;
 await page.click('#tabs .tab[aria-selected="true"] .x'); await page.waitForTimeout(300); out.afterSecondClose = await tabs();
 // close the last tab: the empty screen is back
-await page.click('#tabs .tab[aria-selected="true"] .x'); await page.waitForTimeout(300); out.rest = !!(await page.$('#restOpen')); out.tabsText = await page.textContent('#tabs');
+await page.click('#tabs .tab[aria-selected="true"] .x'); await page.waitForTimeout(300); out.rest = !!(await page.$('#restOpen')); out.barHidden = await page.$eval('#tabbar', e => e.hidden);
 console.log(JSON.stringify(out, null, 1)); console.log(logs.filter(l => /error|PAGEERROR/i.test(l)).join('\n'));
 await browser.close();

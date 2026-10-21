@@ -39,7 +39,7 @@ await page.click('[data-tool="snap"]'); await page.mouse.move(b.x + 80, b.y + 60
 out.snapshot = { toast: await page.textContent('#toast'), clip: await page.evaluate(async () => { try { const items = await navigator.clipboard.read(); return items.map(i => i.types.join('+')); } catch (e) { return 'err ' + e.message; } }) };
 await page.click('#snapTxt'); await page.waitForTimeout(300); out.snapshot.text = await page.evaluate(() => navigator.clipboard.readText().catch(e => 'err'));
 // custom font on a new text item
-await page.click('[data-tool="text"]'); await page.selectOption('#ctx select[aria-label="Font"]', 'tinos'); await page.mouse.click(b.x + 700, b.y + 640); await page.waitForSelector('.obj-text .txt[contenteditable]'); await page.keyboard.type('Tinos text'); await page.keyboard.press('Escape'); await page.waitForTimeout(200);
+await page.click('[data-tool="text"]'); await page.selectOption('#ctx select[aria-label="Font"]', 'tinos'); await page.mouse.click(b.x + 700, b.y + 500); await page.waitForSelector('.obj-text .txt[contenteditable]'); await page.keyboard.type('Tinos text'); await page.keyboard.press('Escape'); await page.waitForTimeout(200);
 out.customFont = await page.$$eval('.obj-text .txt', e => e.map(x => getComputedStyle(x).fontFamily.slice(0, 16)).pop());
 // redact box on page 2 by dragging
 await page.click('[data-tool="redact"]'); const s2 = (await page.$$('.sheet'))[1]; await s2.evaluate(e => e.scrollIntoView({ block: 'start' })); await page.waitForTimeout(200); const b2 = await s2.boundingBox();
