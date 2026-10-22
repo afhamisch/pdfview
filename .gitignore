@@ -8,3 +8,5 @@ server/data/
 .env
 app/public/pdfjs/
 app/undefined/
+desktop/src-tauri/icons/android/
+desktop/src-tauri/icons/ios/
