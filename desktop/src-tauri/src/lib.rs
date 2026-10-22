@@ -50,8 +50,10 @@ fn remove_temp(path: String) -> bool {
 
 /// A second app window; `handoff` is handed to its page through `pending_files` (a JSON string the
 /// page understands, see app/src/desktop.js).
+/// Async on purpose: a synchronous command runs on the main thread, and building a window from
+/// there waits on that same thread, which freezes the whole app on Windows.
 #[tauri::command]
-fn open_window(app: AppHandle, state: State<Pending>, handoff: String) -> Result<(), String> {
+async fn open_window(app: AppHandle, state: State<'_, Pending>, handoff: String) -> Result<(), String> {
     let label = format!("pop-{}", POP_COUNT.fetch_add(1, Ordering::SeqCst) + 1);
     state.0.lock().unwrap().insert(label.clone(), vec![handoff]);
     tauri::WebviewWindowBuilder::new(&app, &label, tauri::WebviewUrl::App("index.html".into()))
