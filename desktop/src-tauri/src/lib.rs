@@ -1,10 +1,14 @@
 // PDFView desktop wrapper: hands files opened from Windows (double-click, "Open with") to the page,
 // and offers a native Save dialog. The page itself is the offline build of the app.
+use std::collections::HashMap;
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_dialog::DialogExt;
 
-struct Pending(Mutex<Vec<String>>);
+/// Files each window should open once its page is ready, by window label.
+struct Pending(Mutex<HashMap<String, Vec<String>>>);
+static POP_COUNT: AtomicU32 = AtomicU32::new(0);
 
 fn file_args<I: Iterator<Item = String>>(args: I) -> Vec<String> {
     args.skip(1)
@@ -14,8 +18,50 @@ fn file_args<I: Iterator<Item = String>>(args: I) -> Vec<String> {
 
 /// Files given on the command line when the app started; the page asks for them once it is ready.
 #[tauri::command]
-fn pending_files(state: State<Pending>) -> Vec<String> {
-    std::mem::take(&mut *state.0.lock().unwrap())
+fn pending_files(window: tauri::WebviewWindow, state: State<Pending>) -> Vec<String> {
+    state
+        .0
+        .lock()
+        .unwrap()
+        .remove(window.label())
+        .unwrap_or_default()
+}
+
+/// Write PDF bytes (raw request body) to a temp file; used to move a document to a new window.
+#[tauri::command]
+fn stash_file(request: tauri::ipc::Request<'_>) -> Result<String, String> {
+    let bytes = match request.body() {
+        tauri::ipc::InvokeBody::Raw(b) => b.clone(),
+        _ => return Err("expected binary body".into()),
+    };
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
+    let path = std::env::temp_dir().join(format!("pdfview-{}.pdf", nanos));
+    std::fs::write(&path, bytes).map_err(|e| e.to_string())?;
+    Ok(path.to_string_lossy().into_owned())
+}
+
+#[tauri::command]
+fn remove_temp(path: String) -> bool {
+    path.contains("pdfview-") && std::fs::remove_file(&path).is_ok()
+}
+
+/// A second app window; `handoff` is handed to its page through `pending_files` (a JSON string the
+/// page understands, see app/src/desktop.js).
+#[tauri::command]
+fn open_window(app: AppHandle, state: State<Pending>, handoff: String) -> Result<(), String> {
+    let label = format!("pop-{}", POP_COUNT.fetch_add(1, Ordering::SeqCst) + 1);
+    state.0.lock().unwrap().insert(label.clone(), vec![handoff]);
+    tauri::WebviewWindowBuilder::new(&app, &label, tauri::WebviewUrl::App("index.html".into()))
+        .title("PDFView")
+        .inner_size(1100.0, 820.0)
+        .min_inner_size(900.0, 600.0)
+        .disable_drag_drop_handler()
+        .build()
+        .map_err(|e| e.to_string())?;
+    Ok(())
 }
 
 #[tauri::command]
@@ -116,19 +162,25 @@ pub fn run() {
                 let _ = w.set_focus();
             }
             if !files.is_empty() {
-                let _ = app.emit("open-files", files);
+                let _ = app.emit_to("main", "open-files", files);
             }
         }))
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
-        .manage(Pending(Mutex::new(file_args(std::env::args()))))
+        .manage(Pending(Mutex::new(HashMap::from([(
+            "main".to_string(),
+            file_args(std::env::args()),
+        )]))))
         .invoke_handler(tauri::generate_handler![
             pending_files,
             read_file,
             save_file,
             write_file,
-            open_files
+            open_files,
+            stash_file,
+            remove_temp,
+            open_window
         ])
         .run(tauri::generate_context!())
         .expect("error while running PDFView");

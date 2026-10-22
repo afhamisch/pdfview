@@ -33,13 +33,15 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
           if [ -n "$TAURI_SIGNING_PRIVATE_KEY" ]; then npx tauri build; else npx tauri build --config '{"bundle":{"createUpdaterArtifacts":false}}'; fi
+      # Branch builds are kept a few days only; the installers that matter are on the Releases page.
+      # Running out of artifact storage must not fail the build.
       - uses: actions/upload-artifact@v4
+        continue-on-error: true
         with:
           name: PDFView-windows
-          path: |
-            desktop/src-tauri/target/release/bundle/nsis/*.exe
-            desktop/src-tauri/target/release/bundle/msi/*.msi
+          path: desktop/src-tauri/target/release/bundle/nsis/*.exe
           if-no-files-found: error
+          retention-days: 3
 
   # Merges to main: a signed GitHub Release that installed copies pick up on their own.
   # Needs the TAURI_SIGNING_PRIVATE_KEY and TAURI_SIGNING_PRIVATE_KEY_PASSWORD repository secrets;

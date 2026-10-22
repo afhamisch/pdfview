@@ -2,6 +2,7 @@
 // files opened from the OS arrive here, and the app checks GitHub for a newer release, installs it in
 // the background and offers a restart. Opening and saving through native dialogs is in fileio.js.
 import { openFromPath } from './fileio.js';
+import { openBytes } from './document.js';
 import { $ } from './ui.js';
 
 async function checkForUpdate(T) {
@@ -20,7 +21,14 @@ async function checkForUpdate(T) {
 export function initDesktop() {
   const T = window.__TAURI__; if (!T?.core?.invoke) return;
   const { invoke } = T.core, { listen } = T.event;
-  const openAll = async files => { if (Array.isArray(files)) for (const p of files) await openFromPath(p); };
+  const openAll = async files => {
+    if (!Array.isArray(files)) return;
+    for (const p of files) {
+      if (typeof p === 'string' && p.startsWith('{')) { // a document moved here from another window (see popout.js)
+        try { const h = JSON.parse(p); const buf = await invoke('read_file', { path: h.temp }); await openBytes(new Uint8Array(buf), h.name || 'document.pdf', { file: h.path ? { kind: 'path', path: h.path } : null }); invoke('remove_temp', { path: h.temp }).catch(() => {}); } catch (e) { console.error('handoff', e); }
+      } else await openFromPath(p);
+    }
+  };
   listen('open-files', e => openAll(e.payload));
   invoke('pending_files').then(openAll).catch(() => {});
   document.body.dataset.desktop = '1';

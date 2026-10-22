@@ -16,6 +16,7 @@ import { initDesktop } from './desktop.js';
 import { initFonts } from './fonts.js';
 import { pickFiles, openFromHandle, handlesFromDrop } from './fileio.js';
 import { initInfo } from './info.js';
+import { popOut, initPopout } from './popout.js';
 
 /* theme: 'system' (default), 'light' or 'dark'; Jonathan's palette follows the OS unless overridden */
 const THEME_KEY = 'pdfview.theme', THEMES = ['system', 'light', 'dark'];
@@ -31,6 +32,18 @@ applyTheme(theme);
 $('#themeBtn').addEventListener('click', () => { theme = THEMES[(THEMES.indexOf(theme) + 1) % THEMES.length]; try { localStorage.setItem(THEME_KEY, theme); } catch {} applyTheme(theme); });
 
 const FILE_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2.5h8l5 5V21a.5.5 0 0 1-.5.5h-12A.5.5 0 0 1 6 21z"/><path d="M14 2.5v5h5"/><path d="M9 13h6M9 17h6"/></svg>';
+let dragTab = null;
+function tabMenu(t, x, y) {
+  document.querySelectorAll('.tabmenu').forEach(m => m.remove());
+  const m = el('div', { class: 'tabmenu', role: 'menu' });
+  const item = (text, fn) => { const b = el('button', { type: 'button', role: 'menuitem', text }); b.addEventListener('click', () => { m.remove(); fn(); }); m.append(b); };
+  item('Open in new window', () => popOut(t));
+  item('Close', () => requestClose(t));
+  if (S.tabs.length > 1) item('Close other tabs', () => { for (const o of [...S.tabs]) if (o !== t) requestClose(o); });
+  document.body.append(m); m.style.left = Math.min(x, innerWidth - m.offsetWidth - 8) + 'px'; m.style.top = Math.min(y, innerHeight - m.offsetHeight - 8) + 'px';
+  const away = e => { if (!m.contains(e.target)) { m.remove(); removeEventListener('pointerdown', away, true); } }; setTimeout(() => addEventListener('pointerdown', away, true), 0);
+  addEventListener('keydown', e => { if (e.key === 'Escape') m.remove(); }, { once: true });
+}
 function renderTabs() {
   const host = $('#tabs'), bar = $('#tabbar'); if (!host) return; host.innerHTML = '';
   if (bar) bar.hidden = !S.tabs.length;
@@ -45,6 +58,14 @@ function renderTabs() {
     b.append(x);
     b.addEventListener('click', () => switchTab(t));
     b.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); switchTab(t); } });
+    b.addEventListener('contextmenu', e => { e.preventDefault(); tabMenu(t, e.clientX, e.clientY); });
+    // drag within the strip reorders; drop outside the window moves the tab to a new window
+    b.draggable = true;
+    b.addEventListener('dragstart', e => { dragTab = t; e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', String(t.id)); } catch {} b.classList.add('dragging'); });
+    b.addEventListener('dragover', e => { if (dragTab && dragTab !== t) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; b.classList.add('dropat'); } });
+    b.addEventListener('dragleave', () => b.classList.remove('dropat'));
+    b.addEventListener('drop', e => { if (!dragTab || dragTab === t) return; e.preventDefault(); e.stopPropagation(); const from = S.tabs.indexOf(dragTab), to = S.tabs.indexOf(t); if (from < 0 || to < 0) return; S.tabs.splice(from, 1); S.tabs.splice(to, 0, dragTab); dragTab = null; renderTabs(); });
+    b.addEventListener('dragend', e => { const was = dragTab; dragTab = null; b.classList.remove('dragging'); host.querySelectorAll('.dropat').forEach(x => x.classList.remove('dropat')); if (!was) return; const outside = e.clientX <= 0 || e.clientY <= 0 || e.clientX >= innerWidth || e.clientY >= innerHeight; if (outside) popOut(was); });
     host.append(b);
   }
   const cur = host.querySelector('.tab[aria-selected="true"]'); if (cur && cur.scrollIntoView) { try { cur.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch {} }
@@ -69,7 +90,7 @@ function requestClose(t) {
 }
 on('doc:open', () => { renderTabs(); setEnabled(true); $('#dirtyDot').hidden = true; emit('ctx'); });
 on('tab:switch', () => { renderTabs(); setEnabled(true); $('#dirtyDot').hidden = !S.dirty; $('#undoBtn').disabled = !S.undo.length; $('#redoBtn').disabled = !S.redo.length; emit('ctx'); });
-on('tabs:changed', renderTabs); on('dirty', renderTabs);
+on('tabs:changed', renderTabs); on('dirty', renderTabs); on('show:rest', () => { if (!S.tabs.length) showRest(); });
 on('doc:close', () => { $('#findbar').hidden = true; });
 
 /* ---------- context strip ---------- */
@@ -120,7 +141,7 @@ addEventListener('keydown', e => {
 
 setHooks({ afterTextLayer: p => applyHighlights(p) });
 import('./ocr.js').then(m => setHooks({ ocrLayer: m.renderOcrLayer }));
-initViewer(); initSearch(); initSidebar(); initInfo();
+initViewer(); initSearch(); initSidebar(); initInfo(); initPopout();
 const mods = await Promise.all([import('./editor.js'), import('./organize.js'), import('./bates.js'), import('./save.js'), import('./sign/index.js'), import('./ocr.js')].map(p => p.catch(e => { console.warn('module', e); return null; })));
 for (const m of mods) if (m && m.init) m.init();
 await Promise.all([pdfjs(), initFonts()]);

@@ -94,7 +94,7 @@ async function sourceBytes(src) {
 }
 
 /* Build the output PDF. Returns { bytes, redacted }. */
-export async function buildPdf({ editLayer = true } = {}) {
+export async function buildPdf({ editLayer = true, transfer = false } = {}) {
   const doc = await PDFDocument.load(await sourceBytes(S.sources.get(0)), { ignoreEncryption: true, updateMetadata: false });
   const helv = await doc.embedFont(StandardFonts.Helvetica), helvB = await doc.embedFont(StandardFonts.HelveticaBold);
   const fontCache = new Map([['helv', helv], ['helv:b', helvB]]);
@@ -107,7 +107,7 @@ export async function buildPdf({ editLayer = true } = {}) {
     }
     return fontCache.get(key);
   };
-  const flatten = $('#flatten').checked; applyMetadata(doc);
+  const flatten = $('#flatten').checked && !transfer; applyMetadata(doc);
   const keptMain = new Set(S.pages.filter(p => p.src === 0).map(p => p.si));
   let form = null; try { form = doc.getForm(); } catch {}
   if (form && form.getFields().length) {
@@ -149,7 +149,7 @@ export async function buildPdf({ editLayer = true } = {}) {
       }
     }
     if (!objs.length && !bx) continue;
-    const isRed = objs.some(o => o.type === 'redact');
+    const isRed = !transfer && objs.some(o => o.type === 'redact'); // a transfer keeps redaction boxes as boxes
     if (isRed) { redIdx.push(idx); redRects.set(idx, objs.filter(o => o.type === 'redact')); }
     page.getContentStream(false); // a fresh stream that holds only added items
     for (const o of objs) {
@@ -173,7 +173,7 @@ export async function buildPdf({ editLayer = true } = {}) {
         continue;
       }
       if (o.type === 'whiteout') page.drawRectangle({ x: bl[0], y: bl[1], width: o.w, height: o.h, rotate: rot, color: rgb(1, 1, 1) });
-      else if (o.type === 'redact') page.drawRectangle({ x: bl[0], y: bl[1], width: o.w, height: o.h, rotate: rot, color: rgb(0, 0, 0) });
+      else if (o.type === 'redact') { if (!transfer) page.drawRectangle({ x: bl[0], y: bl[1], width: o.w, height: o.h, rotate: rot, color: rgb(0, 0, 0) }); }
       else if (o.type === 'highlight') page.drawRectangle({ x: bl[0], y: bl[1], width: o.w, height: o.h, rotate: rot, color: rgb(1, .83, 0), opacity: .42, blendMode: BlendMode.Multiply });
       else if (o.type === 'image') { const img = imgCache[o.src] || (imgCache[o.src] = await doc.embedPng(o.src)); page.drawImage(img, { x: bl[0], y: bl[1], width: o.w, height: o.h, rotate: rot }); }
       else if (o.type === 'check') { const pts = [[.12, .45], [.40, .82], [.90, .18]].map(([u, v]) => offset([o.x, o.y], o.a, u * o.w, v * o.h)); const th = Math.max(1, o.w * .13); for (let i = 0; i < 2; i++) page.drawLine({ start: { x: pts[i][0], y: pts[i][1] }, end: { x: pts[i + 1][0], y: pts[i + 1][1] }, thickness: th, color: hexRgb(o.color), lineCap: LineCapStyle.Round }); }
