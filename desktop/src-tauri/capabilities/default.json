@@ -1,9 +1,10 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Main window: core APIs, the native file dialog, the updater and app restart",
+  "description": "Every app window: core APIs, the native file dialog, the updater and app restart",
   "windows": [
-    "main"
+    "main",
+    "pop-*"
   ],
   "permissions": [
     "core:default",

@@ -65,6 +65,12 @@ Undo and Redo (Ctrl+Z, Ctrl+Y). Hold Shift while drawing with the marker for
 a straight stroke, and with the shape tool for lines and arrows snapped to
 45 degree steps or for a square and a circle.
 
+Two documents side by side: drag a tab out of the strip, or right-click it
+and choose Open in new window, and it moves to its own window with every edit
+intact (in the desktop app a second app window, in the browser a popup
+window); snap the two windows next to each other. Dragging a tab along the
+strip reorders it.
+
 Several PDFs open at once, one per tab: each keeps its pages, placed items,
 typed form values, undo history and scroll position. Ctrl+] and Ctrl+[ switch
 tabs; in the desktop app Ctrl+PageDown, Ctrl+PageUp, Ctrl+Tab and Ctrl+W work

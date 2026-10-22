@@ -20,7 +20,8 @@ Viewer
 - print by opening the saved PDF in the browser's own print path
 
 Editor
-- tabs: several PDFs open at once, each with its own state
+- tabs: several PDFs open at once, each with its own state; a tab can be
+  dragged out to a second window for side-by-side work, and reordered
 - save in place (desktop, Chrome, Edge) and Save as; redacted copies always
   get a new name
 - notes saved as comment annotations; existing comments listed in the sidebar
