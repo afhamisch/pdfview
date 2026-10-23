@@ -16,13 +16,13 @@ async function notesIn(bytes) { const d = await PDFDocument.load(bytes, { update
 await page.goto(url); await page.waitForSelector('body[data-ready]', { state: 'attached' });
 await page.click('#restSample'); await page.waitForFunction(() => document.querySelectorAll('.annotationLayer input').length > 3);
 // place a note, type into it, name the author, close it
-await page.click('[data-tool="note"]'); const b = await (await page.$('.sheet')).boundingBox(); await page.mouse.click(b.x + 500, b.y + 300);
+await page.click('#tools [data-tool="note"]'); const b = await (await page.$('.sheet')).boundingBox(); await page.mouse.click(b.x + 500, b.y + 300);
 await page.waitForSelector('.notepop textarea'); await page.keyboard.type('Check this exhibit against the retainer.');
 await page.fill('.notepop .nauthor', 'Alan'); await page.press('.notepop .nauthor', 'Tab'); await page.waitForTimeout(100);
 await page.keyboard.press('Escape'); await page.waitForTimeout(200);
 out.noteOnPage = await page.$$eval('.obj-note', e => e.length); out.popClosed = !(await page.$('.notepop'));
 // an empty note is dropped when left
-await page.click('[data-tool="note"]'); await page.mouse.click(b.x + 300, b.y + 400); await page.waitForSelector('.notepop textarea'); await page.keyboard.press('Escape'); await page.waitForTimeout(200);
+await page.click('#tools [data-tool="note"]'); await page.mouse.click(b.x + 300, b.y + 400); await page.waitForSelector('.notepop textarea'); await page.keyboard.press('Escape'); await page.waitForTimeout(200);
 out.emptyDropped = (await page.$$eval('.obj-note', e => e.length)) === 1;
 // the Notes tab in the sidebar lists it
 await page.keyboard.press('Control+b'); await page.click('#tabNotes'); await page.waitForSelector('.note-row', { timeout: 10000 });

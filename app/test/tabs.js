@@ -11,7 +11,7 @@ await page.goto(url); await page.waitForSelector('body[data-ready]', { state: 'a
 out.empty = await page.$eval('#tabbar', e => e.hidden);
 await page.click('#restSample'); await page.waitForFunction(() => document.querySelectorAll('.annotationLayer input').length > 3);
 await page.fill('.annotationLayer input[type=text]', 'Tab one value');
-await page.click('[data-tool="check"]'); const b = await (await page.$('.sheet')).boundingBox(); await page.mouse.click(b.x + 300, b.y + 300); await page.waitForSelector('.obj-check');
+await page.click('#tools [data-tool="check"]'); const b = await (await page.$('.sheet')).boundingBox(); await page.mouse.click(b.x + 300, b.y + 300); await page.waitForSelector('.obj-check');
 await page.evaluate(() => document.querySelector('#scroller').scrollTop = 400); await page.waitForTimeout(200);
 out.one = await tabs();
 // second file in a new tab
@@ -32,7 +32,7 @@ await page.click('#tabs .tab:nth-child(2) .x'); await page.waitForTimeout(200); 
 await page.click('#tabs .tab[aria-selected="true"] .x'); await page.waitForTimeout(400); out.afterCloseActive = await tabs(); out.pagesNow = await page.$$eval('.pg', e => e.length);
 // a dirty tab needs two clicks to close: mark the sample dirty? samples never count, so edit wordlike instead
 await page.click('#tabs .tab:nth-child(2)'); await page.waitForTimeout(300);
-await page.click('[data-tool="check"]'); const b2 = await (await page.$('.sheet')).boundingBox(); await page.mouse.click(b2.x + 200, b2.y + 200); await page.waitForSelector('.obj-check');
+await page.click('#tools [data-tool="check"]'); const b2 = await (await page.$('.sheet')).boundingBox(); await page.mouse.click(b2.x + 200, b2.y + 200); await page.waitForSelector('.obj-check');
 out.dirtyTabs = await tabs();
 await page.click('#tabs .tab[aria-selected="true"] .x'); await page.waitForTimeout(200); out.firstCloseToast = await page.textContent('#toast'); out.stillOpen = (await tabs()).length;
 await page.click('#tabs .tab[aria-selected="true"] .x'); await page.waitForTimeout(300); out.afterSecondClose = await tabs();

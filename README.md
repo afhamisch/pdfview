@@ -64,7 +64,9 @@ button opens Settings: which build is running and, in the desktop app, a Check
 for updates button; the theme; the name written on your notes; and the
 envelope service token when the app is served by the server.
 
-Undo and Redo (Ctrl+Z, Ctrl+Y). Hold Shift while drawing with the marker for
+A placing tool (Text, Stamp, Check, Note) stays active after each placement
+so you can add several in a row; with the Text tool, clicking existing text
+edits it. Escape or Select ends the tool. Undo and Redo (Ctrl+Z, Ctrl+Y). Hold Shift while drawing with the marker for
 a straight stroke, and with the shape tool for lines and arrows snapped to
 45 degree steps or for a square and a circle.
 

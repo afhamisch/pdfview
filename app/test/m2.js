@@ -15,7 +15,7 @@ await page.click('#restSample'); await page.waitForFunction(() => document.query
 await page.fill('.annotationLayer input[type=text]', 'Alan F. Hamisch'); await page.check('.annotationLayer input[type=checkbox]');
 // add text
 await page.evaluate(() => document.querySelector('#scroller').scrollTop = 0); await page.waitForTimeout(200);
-await page.click('[data-tool="text"]'); const sheet = await page.$('.sheet'); const b = await sheet.boundingBox();
+await page.click('#tools [data-tool="text"]'); const sheet = await page.$('.sheet'); const b = await sheet.boundingBox();
 await page.mouse.click(b.x + 400, b.y + 560); await page.waitForSelector('.obj-text .txt[contenteditable]'); await page.keyboard.type('Added by PDFView'); await page.keyboard.press('Enter'); await page.keyboard.type('Second point here'); await page.keyboard.press('Escape');
 // format it: Times, bold, bullets, then widen the box by dragging the corner handle
 await page.click('.obj-text'); await page.selectOption('#ctx select[aria-label="Font"]', 'times'); await page.click('#ctx button[title^="Bold"]'); await page.selectOption('#ctx select[aria-label="List"]', 'bullet');
@@ -23,26 +23,26 @@ await page.click('.obj-text'); await page.selectOption('#ctx select[aria-label="
 await page.keyboard.press('Escape'); await page.waitForTimeout(200);
 out.textStyle = await page.$eval('.obj-text .txt', e => ({ font: getComputedStyle(e).fontFamily.slice(0, 15), weight: getComputedStyle(e).fontWeight, list: e.classList.contains('list'), text: e.textContent.slice(0, 20), width: e.closest('.obj').style.width }));
 // stamp
-await page.click('[data-tool="stamp"]'); await page.selectOption('#stampPick', 'CONFIDENTIAL'); await page.mouse.click(b.x + 700, b.y + 150); await page.waitForTimeout(200);
+await page.click('#tools [data-tool="stamp"]'); await page.selectOption('#stampPick', 'CONFIDENTIAL'); await page.mouse.click(b.x + 700, b.y + 150); await page.waitForTimeout(200);
 // check mark
-await page.click('[data-tool="check"]'); await page.mouse.click(b.x + 100, b.y + 600);
+await page.click('#tools [data-tool="check"]'); await page.mouse.click(b.x + 100, b.y + 600);
 // highlight from text selection: select the first long span on page 1 then press H
-await page.click('[data-tool="select"]');
+await page.click('#tools [data-tool="select"]');
 await page.evaluate(() => { const spans = [...document.querySelectorAll('.pg:nth-child(1) .textLayer span')].filter(s => s.textContent.length > 20); const r = document.createRange(); r.selectNodeContents(spans[0]); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); });
 await page.keyboard.press('h');
 // marker stroke, arrow, eraser stroke, then a snapshot of the title area
-await page.click('[data-tool="draw"]'); await page.mouse.move(b.x + 300, b.y + 420); await page.mouse.down(); for (let i = 1; i <= 6; i++) await page.mouse.move(b.x + 300 + i * 40, b.y + 420 + (i % 2) * 6); await page.mouse.up();
-await page.click('[data-tool="shape"]'); await page.selectOption('#shapeKind', 'arrow'); await page.mouse.move(b.x + 900, b.y + 300); await page.mouse.down(); await page.mouse.move(b.x + 1000, b.y + 380, { steps: 4 }); await page.mouse.up();
-await page.click('[data-tool="erase"]'); await page.mouse.move(b.x + 350, b.y + 250); await page.mouse.down(); await page.mouse.move(b.x + 420, b.y + 250, { steps: 4 }); await page.mouse.up();
+await page.click('#tools [data-tool="draw"]'); await page.mouse.move(b.x + 300, b.y + 420); await page.mouse.down(); for (let i = 1; i <= 6; i++) await page.mouse.move(b.x + 300 + i * 40, b.y + 420 + (i % 2) * 6); await page.mouse.up();
+await page.click('#tools [data-tool="shape"]'); await page.selectOption('#shapeKind', 'arrow'); await page.mouse.move(b.x + 900, b.y + 300); await page.mouse.down(); await page.mouse.move(b.x + 1000, b.y + 380, { steps: 4 }); await page.mouse.up();
+await page.click('#tools [data-tool="erase"]'); await page.mouse.move(b.x + 350, b.y + 250); await page.mouse.down(); await page.mouse.move(b.x + 420, b.y + 250, { steps: 4 }); await page.mouse.up();
 await ctx.grantPermissions(['clipboard-read', 'clipboard-write']);
-await page.click('[data-tool="snap"]'); await page.mouse.move(b.x + 80, b.y + 60); await page.mouse.down(); await page.mouse.move(b.x + 600, b.y + 140, { steps: 4 }); await page.mouse.up(); await page.waitForTimeout(600);
+await page.click('#tools [data-tool="snap"]'); await page.mouse.move(b.x + 80, b.y + 60); await page.mouse.down(); await page.mouse.move(b.x + 600, b.y + 140, { steps: 4 }); await page.mouse.up(); await page.waitForTimeout(600);
 out.snapshot = { toast: await page.textContent('#toast'), clip: await page.evaluate(async () => { try { const items = await navigator.clipboard.read(); return items.map(i => i.types.join('+')); } catch (e) { return 'err ' + e.message; } }) };
 await page.click('#snapTxt'); await page.waitForTimeout(300); out.snapshot.text = await page.evaluate(() => navigator.clipboard.readText().catch(e => 'err'));
 // custom font on a new text item
-await page.click('[data-tool="text"]'); await page.selectOption('#ctx select[aria-label="Font"]', 'tinos'); await page.mouse.click(b.x + 700, b.y + 500); await page.waitForSelector('.obj-text .txt[contenteditable]'); await page.keyboard.type('Tinos text'); await page.keyboard.press('Escape'); await page.waitForTimeout(200);
+await page.click('#tools [data-tool="text"]'); await page.selectOption('#ctx select[aria-label="Font"]', 'tinos'); await page.mouse.click(b.x + 700, b.y + 500); await page.waitForSelector('.obj-text .txt[contenteditable]'); await page.keyboard.type('Tinos text'); await page.keyboard.press('Escape'); await page.waitForTimeout(200);
 out.customFont = await page.$$eval('.obj-text .txt', e => e.map(x => getComputedStyle(x).fontFamily.slice(0, 16)).pop());
 // redact box on page 2 by dragging
-await page.click('[data-tool="redact"]'); const s2 = (await page.$$('.sheet'))[1]; await s2.evaluate(e => e.scrollIntoView({ block: 'start' })); await page.waitForTimeout(200); const b2 = await s2.boundingBox();
+await page.click('#tools [data-tool="redact"]'); const s2 = (await page.$$('.sheet'))[1]; await s2.evaluate(e => e.scrollIntoView({ block: 'start' })); await page.waitForTimeout(200); const b2 = await s2.boundingBox();
 await page.mouse.move(b2.x + 60, b2.y + 60); await page.mouse.down(); await page.mouse.move(b2.x + 500, b2.y + 200, { steps: 5 }); await page.mouse.up();
 out.objects = await page.$$eval('.obj', e => e.map(x => x.className.replace(/obj |sel/g, '').trim()));
 // bates

@@ -5,7 +5,7 @@ import { writeOut } from './fileio.js';
 import { pdfjsLib as lib, docOptions } from './pdfjs.js';
 import { S, on, emit, coveredWords } from './state.js';
 import { offset, rotOf } from './geometry.js';
-import { $, toast, plural } from './ui.js';
+import { $, el, toast, plural } from './ui.js';
 import { EDIT_KEY, hash } from './document.js';
 import { batesBox } from './bates.js';
 import { markDirty } from './editor.js';
@@ -248,8 +248,18 @@ export async function print() {
   if (!S.doc || busy) return; busy = true; S.saving = true; $('#printBtn').disabled = true;
   try {
     const { bytes } = await buildPdf(); const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
-    const w = window.open(url, '_blank'); if (!w) toast('Allow pop-ups for this page to print.'); else toast('The PDF opened in a new tab. Use the browser print button there (Ctrl+P).');
-    setTimeout(() => URL.revokeObjectURL(url), 60000);
+    if (window.__TAURI__) {
+      // The desktop webview blocks pop-ups: the PDF goes into a hidden frame and that frame prints.
+      const old = $('#printFrame'); if (old) old.remove();
+      const f = el('iframe', { id: 'printFrame', title: 'Print', style: { position: 'fixed', right: '0', bottom: '0', width: '1px', height: '1px', opacity: '0', border: '0' } });
+      f.addEventListener('load', () => { setTimeout(() => { try { f.contentWindow.focus(); f.contentWindow.print(); } catch (e) { console.warn('print', e); toast('The print dialog could not be opened. Save the file and print it from your PDF app.'); } }, 400); });
+      f.src = url; document.body.append(f);
+      toast('The print dialog opens in a moment.');
+      setTimeout(() => { f.remove(); URL.revokeObjectURL(url); }, 10 * 60 * 1000);
+    } else {
+      const w = window.open(url, '_blank'); if (!w) toast('Allow pop-ups for this page to print.'); else toast('The PDF opened in a new tab. Use the browser print button there (Ctrl+P).');
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    }
   } catch (e) { console.error(e); toast('This PDF could not be prepared for printing.'); }
   finally { busy = false; S.saving = false; $('#printBtn').disabled = false; }
 }

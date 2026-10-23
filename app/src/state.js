@@ -19,6 +19,7 @@ export const S = {
 // Everything that belongs to one open document rather than to the app.
 export const DOC_KEYS = ['doc', 'bytes', 'name', 'sample', 'sources', 'pages', 'reg', 'scale', 'fit', 'objects', 'sel', 'editing', 'undo', 'dirty', 'bates', 'meta', 'formDirty', 'lifts', 'lib', 'hover', 'lifting', 'org', 'osel', 'anchor', 'orgReturn', 'snap', 'file', 'redo'];
 export const bus = new EventTarget();
+if (typeof window !== 'undefined') window.__pdfview = S; // read-only peek for tests and debugging
 /* Which build this is: the desktop wrapper fills in its release version; every build carries its date. */
 export const APP = { version: '', built: typeof __BUILD__ !== 'undefined' ? __BUILD__ : '' };
 export const versionLabel = () => APP.version ? `PDFView ${APP.version}, built ${APP.built}` : `PDFView web, built ${APP.built}`;

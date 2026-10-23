@@ -30,7 +30,7 @@ await page.goto(url); await page.waitForSelector('body[data-ready]', { state: 'a
 await page.click('#restSample'); await page.waitForFunction(() => document.querySelectorAll('.annotationLayer input').length > 3);
 await page.setInputFiles('#fileIn', fx); await page.waitForSelector('.textLayer span:text("Defendant, John Doe")', { timeout: 15000 });
 // draw a redaction box over the first paragraph
-await page.click('[data-tool="redact"]'); const sp = await page.$('.textLayer span:text("Defendant, John Doe")'); const b = await sp.boundingBox();
+await page.click('#tools [data-tool="redact"]'); const sp = await page.$('.textLayer span:text("Defendant, John Doe")'); const b = await sp.boundingBox();
 await page.mouse.move(b.x - 4, b.y - 4); await page.mouse.down(); await page.mouse.move(b.x + b.width + 4, b.y + b.height * 3 + 6, { steps: 4 }); await page.mouse.up(); await page.waitForTimeout(200);
 out.boxes = await page.$$eval('.obj-redact', e => e.length);
 await page.click('#saveBtn'); await page.waitForSelector('#redModal:not([hidden])'); out.lead = await page.textContent('#redLead');

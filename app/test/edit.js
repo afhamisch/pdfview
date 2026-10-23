@@ -16,7 +16,7 @@ await page.goto(url); await page.waitForSelector('body[data-ready]', { state: 'a
 await page.click('#restSample'); await page.waitForFunction(() => document.querySelectorAll('.annotationLayer input').length > 3);
 // on the sample form: type a value, lift the subtitle line, the value must survive the page reload
 await page.fill('.annotationLayer input[type=text]', 'Alan F. Hamisch'); await page.waitForTimeout(100);
-await page.click('[data-tool="text"]');
+await page.click('#tools [data-tool="text"]');
 { const sp = await page.$('.textLayer span:text("Complete each field")'); const b = await sp.boundingBox(); await page.mouse.move(b.x + 30, b.y + b.height / 2); await page.waitForTimeout(300); await page.mouse.move(b.x + 32, b.y + b.height / 2); await page.waitForSelector('.liftbox', { timeout: 5000 }); await page.mouse.click(b.x + 32, b.y + b.height / 2); await page.waitForSelector('.obj-text .txt[contenteditable]', { timeout: 15000 }); }
 out.sampleLift = await page.evaluate(() => { const t = document.querySelector('.obj-text .txt[contenteditable]'); return { text: t.innerText.slice(0, 30), font: t.style.fontFamily.slice(0, 16) }; });
 await page.keyboard.press('Escape'); await page.waitForTimeout(600);
@@ -25,7 +25,7 @@ out.formIds = await page.evaluate(() => [...document.querySelectorAll('.annotati
 await page.setInputFiles('#fileIn', join(here, 'fixtures/wordlike.pdf')); await page.waitForSelector('.textLayer span:text("Defendant, John Doe")', { timeout: 15000 });
 const before = await items(readFileSync(join(here, 'fixtures/wordlike.pdf')));
 // find the first paragraph on screen through its text span, hover it in the text tool, click
-await page.click('[data-tool="text"]');
+await page.click('#tools [data-tool="text"]');
 const span = await page.$('.textLayer span:text("Defendant, John Doe")'); const sb = await span.boundingBox();
 await page.mouse.move(sb.x + 40, sb.y + sb.height / 2); await page.waitForTimeout(300); await page.mouse.move(sb.x + 42, sb.y + sb.height / 2);
 await page.waitForSelector('.liftbox', { timeout: 5000 }); out.hoverBox = true;
@@ -44,7 +44,7 @@ await page.keyboard.press('Control+z'); await page.waitForTimeout(100); await pa
 await page.waitForFunction(() => [...document.querySelectorAll('.textLayer span')].some(s => /Defendant, John Doe/.test(s.textContent)), null, { timeout: 10000 }); out.undoRestored = true;
 out.objsAfterUndo = await page.evaluate(() => document.querySelectorAll('.obj-text').length);
 // lift again, edit, save
-await page.click('[data-tool="text"]'); const span2 = await page.$('.textLayer span:text("Defendant, John Doe")'); const sb2 = await span2.boundingBox();
+await page.click('#tools [data-tool="text"]'); const span2 = await page.$('.textLayer span:text("Defendant, John Doe")'); const sb2 = await span2.boundingBox();
 await page.mouse.move(sb2.x + 40, sb2.y + sb2.height / 2); await page.waitForTimeout(300); await page.mouse.move(sb2.x + 42, sb2.y + sb2.height / 2); await page.waitForSelector('.liftbox');
 await page.mouse.click(sb2.x + 42, sb2.y + sb2.height / 2); await page.waitForSelector('.obj-text .txt[contenteditable]', { timeout: 15000 });
 await page.keyboard.press('Control+Home'); for (let i = 0; i < 'Defendant'.length; i++) await page.keyboard.press('Shift+ArrowRight'); await page.keyboard.type('Respondent'); await page.keyboard.press('Escape'); await page.waitForTimeout(200);
