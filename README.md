@@ -123,6 +123,10 @@ server for `dist`) at URL.
 
 ## Windows default viewer
 
+Install it from https://github.com/afhamisch/pdfview/releases/latest/download/PDFView-Setup.exe
+(always the newest version; the Releases page lists every version). Send that
+link rather than the file: mail services refuse `.exe` attachments.
+
 See `desktop/README.md`. A Tauri wrapper registers the `.pdf` file association
 and opens files in this app. The `Desktop (Windows installer)` workflow under
 Actions builds it and uploads the installer as an artifact; merges to `main`
