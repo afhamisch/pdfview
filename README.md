@@ -59,7 +59,10 @@ places a sticky note that is saved as a real comment annotation, so Adobe and
 other viewers show it, and comments already in a file are listed with yours
 under Notes in the sidebar. Info shows the document properties (size, page
 size, version, dates, creator, fonts, attachments) and lets you change the
-title, author, subject and keywords, or strip all metadata on save.
+title, author, subject and keywords, or strip all metadata on save. The gear
+button opens Settings: which build is running and, in the desktop app, a Check
+for updates button; the theme; the name written on your notes; and the
+envelope service token when the app is served by the server.
 
 Undo and Redo (Ctrl+Z, Ctrl+Y). Hold Shift while drawing with the marker for
 a straight stroke, and with the shape tool for lines and arrows snapped to

@@ -17,19 +17,13 @@ import { initFonts } from './fonts.js';
 import { pickFiles, openFromHandle, handlesFromDrop } from './fileio.js';
 import { initInfo } from './info.js';
 import { popOut, initPopout } from './popout.js';
+import { initTheme, initSettings } from './settings.js';
 
-/* theme: 'system' (default), 'light' or 'dark'; Jonathan's palette follows the OS unless overridden */
-const THEME_KEY = 'pdfview.theme', THEMES = ['system', 'light', 'dark'];
-function applyTheme(t) {
-  if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme;
-  const b = document.getElementById('themeBtn'); if (b) b.title = t === 'system' ? 'Theme: follows your system. Click for light.' : t === 'light' ? 'Theme: light. Click for dark.' : 'Theme: dark. Click to follow your system.';
-}
-let theme = 'system'; try { theme = THEMES.includes(localStorage.getItem(THEME_KEY)) ? localStorage.getItem(THEME_KEY) : 'system'; } catch {}
-applyTheme(theme);
+/* theme: 'system' (default), 'light' or 'dark'; applied before the shell is drawn so nothing flashes */
+initTheme();
 document.getElementById('app').innerHTML = SHELL;
 document.body.dataset.tool = 'select';
-applyTheme(theme);
-$('#themeBtn').addEventListener('click', () => { theme = THEMES[(THEMES.indexOf(theme) + 1) % THEMES.length]; try { localStorage.setItem(THEME_KEY, theme); } catch {} applyTheme(theme); });
+initTheme();
 
 const FILE_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2.5h8l5 5V21a.5.5 0 0 1-.5.5h-12A.5.5 0 0 1 6 21z"/><path d="M14 2.5v5h5"/><path d="M9 13h6M9 17h6"/></svg>';
 let dragTab = null;
@@ -142,7 +136,7 @@ addEventListener('keydown', e => {
 
 setHooks({ afterTextLayer: p => applyHighlights(p) });
 import('./ocr.js').then(m => setHooks({ ocrLayer: m.renderOcrLayer }));
-initViewer(); initSearch(); initSidebar(); initInfo(); initPopout();
+initViewer(); initSearch(); initSidebar(); initInfo(); initPopout(); initSettings();
 const mods = await Promise.all([import('./editor.js'), import('./organize.js'), import('./bates.js'), import('./save.js'), import('./sign/index.js'), import('./ocr.js')].map(p => p.catch(e => { console.warn('module', e); return null; })));
 for (const m of mods) if (m && m.init) m.init();
 await Promise.all([pdfjs(), initFonts()]);

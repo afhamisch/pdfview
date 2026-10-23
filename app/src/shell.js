@@ -11,6 +11,7 @@ export const SHELL = `
       <button class="tb" id="sideBtn" aria-pressed="false" title="Pages and bookmarks">${ICON.side}</button>
       <button class="tb" id="findBtn" title="Find (Ctrl+F)">${ICON.find}</button>
       <button class="tb" id="themeBtn" title="Theme: follows your system. Click to switch." aria-label="Theme">${ICON.theme}</button>
+      <button class="tb" id="settingsBtn" title="Settings: version and updates, theme, your name on notes" aria-label="Settings">${ICON.gear}</button>
     </div>
     <div class="grp">
       <button class="tb" id="zoomOut" title="Zoom out (Ctrl+minus)" aria-label="Zoom out">${ICON.minus}</button>
