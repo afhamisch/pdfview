@@ -109,4 +109,5 @@ export const REST = `<div class="rest"><div class="rest-card">
   <button class="btn primary" id="restOpen" type="button">Open PDF</button>
   <p class="small">or drag a PDF anywhere onto this window</p>
   <button class="linkbtn" id="restSample" type="button">Try it on a sample form</button>
+  <p class="small ver" id="restVer"></p>
 </div></div>`;
