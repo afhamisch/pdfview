@@ -4,6 +4,7 @@
 import { openFromPath } from './fileio.js';
 import { openBytes } from './document.js';
 import { $ } from './ui.js';
+import { APP, versionLabel } from './state.js';
 
 async function checkForUpdate(T) {
   const up = T.updater, proc = T.process;
@@ -32,5 +33,6 @@ export function initDesktop() {
   listen('open-files', e => openAll(e.payload));
   invoke('pending_files').then(openAll).catch(() => {});
   document.body.dataset.desktop = '1';
+  if (T.app?.getVersion) T.app.getVersion().then(v => { APP.version = v; document.title = `PDFView ${v}`; const el = $('#restVer'); if (el) el.textContent = versionLabel(); }).catch(() => {});
   setTimeout(() => checkForUpdate(T), 4000); setInterval(() => checkForUpdate(T), 4 * 3600 * 1000);
 }

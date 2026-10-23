@@ -1,7 +1,7 @@
 import 'pdfjs-dist/web/pdf_viewer.css';
 import './fonts.css';
 import './styles.css';
-import { S, on, emit } from './state.js';
+import { S, on, emit, versionLabel } from './state.js';
 import { $, $$, el, toast, anyModalOpen, ICON } from './ui.js';
 import { SHELL, REST } from './shell.js';
 import { pdfjs } from './pdfjs.js';
@@ -79,6 +79,7 @@ export function showRest() {
   $('#pages').innerHTML = REST;
   $('#restOpen').addEventListener('click', pickFiles);
   $('#restSample').addEventListener('click', loadSample);
+  $('#restVer').textContent = versionLabel();
   renderTabs(); setEnabled(false); $('#dirtyDot').hidden = true; emit('ctx');
 }
 async function loadSample() { try { await openBytes(new Uint8Array(await makeSample()), 'sample-intake-form.pdf', { sample: true }); } catch (e) { console.error(e); toast('The sample form could not be created.'); } }

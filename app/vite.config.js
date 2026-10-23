@@ -5,7 +5,7 @@ export default defineConfig(({ mode }) => {
   const offline = mode === 'offline' || !!process.env.OFFLINE, desktop = mode === 'desktop';
   return {
   base: desktop ? './' : '/',
-  define: { __OFFLINE__: JSON.stringify(offline) },
+  define: { __OFFLINE__: JSON.stringify(offline), __BUILD__: JSON.stringify(new Date().toISOString().slice(0, 10)) },
   plugins: offline ? [viteSingleFile({ removeViteModuleLoader: true })] : [],
   build: {
     target: 'es2022',
