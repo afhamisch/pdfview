@@ -101,3 +101,12 @@ jobs:
           prerelease: false
           includeUpdaterJson: true
           updaterJsonPreferNsis: true
+      # A copy of the installer under a fixed name, so one link always serves the newest version:
+      # https://github.com/afhamisch/pdfview/releases/latest/download/PDFView-Setup.exe
+      - if: steps.key.outputs.has == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cp desktop/src-tauri/target/release/bundle/nsis/PDFView_${{ steps.ver.outputs.version }}_x64-setup.exe PDFView-Setup.exe
+          gh release upload "v${{ steps.ver.outputs.version }}" PDFView-Setup.exe --clobber
