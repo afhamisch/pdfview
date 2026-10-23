@@ -7,7 +7,7 @@ page.on('dialog', d => d.accept());
 await page.goto(base + '/'); await page.waitForSelector('body[data-ready]', { state: 'attached' }); await page.screenshot({ path: outDir + '/1-rest.png' });
 await page.click('#restSample'); await page.waitForFunction(() => document.querySelectorAll('.annotationLayer input').length > 3); await page.waitForTimeout(600);
 await page.click('#sideBtn'); await page.waitForTimeout(800);
-await page.click('[data-tool="text"]'); const b = await (await page.$('.sheet')).boundingBox(); await page.mouse.click(b.x + 300, b.y + 560); await page.waitForSelector('.obj-text .txt[contenteditable]'); await page.keyboard.type('Added text'); await page.keyboard.press('Escape');
+await page.click('#tools [data-tool="text"]'); const b = await (await page.$('.sheet')).boundingBox(); await page.mouse.click(b.x + 300, b.y + 560); await page.waitForSelector('.obj-text .txt[contenteditable]'); await page.keyboard.type('Added text'); await page.keyboard.press('Escape');
 await page.evaluate(() => { const spans = [...document.querySelectorAll('.pg:nth-child(1) .textLayer span')].filter(s => s.textContent.length > 20); const r = document.createRange(); r.selectNodeContents(spans[0]); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); }); await page.keyboard.press('h');
 await page.keyboard.press('Control+f'); await page.fill('#findIn', 'client'); await page.waitForTimeout(600);
 await page.screenshot({ path: outDir + '/2-desk.png' });

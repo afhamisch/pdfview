@@ -102,7 +102,7 @@ export async function liftBlock(p, bl) {
       try { const lib = await libDoc(); S.lifts.push(removeBlock(lib, p.si, p.edit.an, bl)); await commitLib(); await rendered(p); } finally { cover.remove(); }
     }
     else { const r = blockRect(bl, 1, 1); addObj(p, { type: 'whiteout', x: r.x, y: r.y, w: r.w, h: r.h, a: r.a }); toast(bl.ocr ? 'Recognized text: the scanned words are covered with white and the text is typed on top.' : 'This text is part of a graphic, so it is covered with white and typed on top.', 5000); }
-    const obj = addObj(p, o); if (ocrIdx.length) emit('ocr:refresh', p); setTool('select'); setTimeout(() => startEdit(obj), 0);
+    const obj = addObj(p, o); if (ocrIdx.length) emit('ocr:refresh', p); setTimeout(() => startEdit(obj), 0);
   } catch (e) { console.error(e); toast('That text could not be opened for editing.'); }
   finally { S.lifting = false; }
 }
@@ -159,10 +159,13 @@ export function select(id) {
 }
 const noteSvg = color => `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 4.5a1.5 1.5 0 0 1 1.5-1.5h14a1.5 1.5 0 0 1 1.5 1.5v10a1.5 1.5 0 0 1-1.5 1.5h-8.2L6 20.5V16H5a1.5 1.5 0 0 1-1.5-1.5z" fill="${color || '#ffd400'}" stroke="#6b5300" stroke-width="1.1"/><path d="M7.5 8h9M7.5 11.5h6" stroke="#6b5300" stroke-width="1.2" stroke-linecap="round"/></svg>`;
 const findEl = (p, o) => p.ol.querySelector(`[data-id="${o.id}"]`);
+/* Finish the text being typed, if any: its blur handler commits the wording and drops an empty box. */
+function endEditing() { if (S.editing != null && document.activeElement && document.activeElement !== document.body) document.activeElement.blur(); }
 function objDown(p, o, e) {
   if (e.button > 0) return; e.stopPropagation();
   if (S.editing === o.id) return;
   if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
+  if (S.tool === 'text' && o.type === 'text') { e.preventDefault(); select(o.id); setTimeout(() => startEdit(o), 0); return; } // the Text tool edits what it clicks
   if (S.tool !== 'select' && S.tool !== 'field') setTool('select');
   const wasSel = S.sel === o.id; if (!wasSel) select(o.id);
   e.preventDefault();
@@ -235,20 +238,21 @@ function sheetDown(p, e) {
     addEventListener('pointerup', up); addEventListener('pointercancel', up); return;
   }
   e.preventDefault();
+  // A tool stays active after each placement (Escape or Select ends it); the previous item is finished first.
+  endEditing(); if (S.sel != null) select(null);
   if (tool === 'text') {
     const bl = S.hover && S.hover.p === p ? S.hover.bl : (p.edit ? blockAt(p.edit.blocks, P) : null);
     if (bl) { liftBlock(p, bl); return; }
     pushUndo(); const tl = offset(P, R, -2, -(S.tsize * 0.75 + 2));
     const o = addObj(p, Object.assign({ type: 'text', x: tl[0], y: tl[1], a: R, text: '', size: S.tsize, color: S.tcolor }, S.textStyle));
-    setTool('select'); setTimeout(() => startEdit(o), 0);
+    setTimeout(() => startEdit(o), 0);
   } else if (tool === 'stamp') {
     pushUndo(); const text = S.stamp || STAMPS[0], size = 14; const tl = offset(P, R, -(text.length * size * 0.33), -(size * 0.9));
     addObj(p, { type: 'text', box: true, x: tl[0], y: tl[1], a: R, text, size, color: S.tcolor === '#111111' ? '#b3261e' : S.tcolor });
-    setTool('select');
+    S.sel = null; renderObjs(p); emit('ctx'); // the picker stays up for the next stamp
   } else if (tool === 'note') {
     pushUndo(); const z = 18, tl = offset(P, R, -z / 2, -z / 2);
     addObj(p, { type: 'note', x: tl[0], y: tl[1], w: z, h: z, a: R, text: '', author: S.author || '', color: S.noteColor, created: new Date().toISOString(), fresh: true });
-    setTool('select');
   } else if (tool === 'check') {
     pushUndo(); const z = 12, tl = offset(P, R, -z / 2, -z / 2);
     addObj(p, { type: 'check', x: tl[0], y: tl[1], w: z, h: z, ar: 1, a: R, color: S.tcolor });
@@ -438,7 +442,7 @@ function renderCtx(c) {
       c.append(el('span', { class: 'lbl', text: 'Text' }));
       const target = Object.assign({ size: S.tsize, color: S.tcolor }, S.textStyle);
       textToolbar(c, target, { isDefault: true, onChange: mut => { mut(target); S.tsize = target.size; S.tcolor = target.color; const { size, color, ...rest } = target; S.textStyle = rest; emit('ctx'); } });
-      c.append(el('span', { class: 'hint', text: 'Click text on the page to edit it, or click an empty spot to add text.' }));
+      c.append(el('span', { class: 'hint', text: 'Click text on the page to edit it, or an empty spot to add text. The tool stays on until you press Escape or pick Select.' }));
       return true;
     }
     return false;
@@ -503,7 +507,7 @@ export function init() {
     if (mod && e.key.toLowerCase() === 'y' && !typing) { e.preventDefault(); redo(); return true; }
     if (typing || S.org) return false;
     if ((e.key === 'Delete' || e.key === 'Backspace') && S.sel != null) { e.preventDefault(); removeSel(); return true; }
-    if (e.key === 'Escape') { if (S.sel != null) select(null); else setTool('select'); return true; }
+    if (e.key === 'Escape') { if (S.sel != null) select(null); if (S.tool !== 'select') setTool('select'); return true; }
     if (mod || e.altKey) return false;
     const k = { v: 'select', t: 'text', m: 'stamp', k: 'check', s: 'sign', h: 'highlight', c: 'note', d: 'draw', a: 'shape', e: 'erase', w: 'whiteout', r: 'redact', n: 'snap' }[e.key.toLowerCase()];
     if (k && S.doc) { if ((k === 'highlight' || k === 'whiteout' || k === 'redact') && markSelection(k)) return true; setTool(k); return true; }

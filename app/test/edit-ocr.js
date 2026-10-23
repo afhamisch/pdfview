@@ -18,7 +18,7 @@ await page.waitForFunction(() => /Recognized|failed|Stopped/.test(document.query
 out.ocrSpans = await page.$$eval('.ocrLayer span.ocr', e => e.length);
 // hover the first recognized word in the text tool and lift its block
 await page.evaluate(() => { document.querySelector('#scroller').scrollTop = 0; }); await page.waitForTimeout(200);
-await page.click('[data-tool="text"]');
+await page.click('#tools [data-tool="text"]');
 const sp = await page.$(`.ocrLayer span.ocr:text("${word}")`); const b = await sp.boundingBox();
 await page.mouse.move(b.x + 5, b.y + b.height / 2); await page.waitForTimeout(300); await page.mouse.move(b.x + 7, b.y + b.height / 2); await page.waitForSelector('.liftbox', { timeout: 10000 });
 await page.mouse.click(b.x + 7, b.y + b.height / 2); await page.waitForSelector('.obj-text .txt[contenteditable]', { timeout: 15000 });

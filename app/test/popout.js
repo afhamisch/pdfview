@@ -11,8 +11,8 @@ await page.goto(url); await page.waitForSelector('body[data-ready]', { state: 'a
 await page.click('#restSample'); await page.waitForFunction(() => document.querySelectorAll('.annotationLayer input').length > 3);
 await page.setInputFiles('#fileIn', join(here, 'fixtures/wordlike.pdf')); await page.waitForSelector('.textLayer span:text("Defendant, John Doe")', { timeout: 15000 });
 // mark the wordlike document so the move can be checked
-await page.click('[data-tool="check"]'); const b = await (await page.$('.sheet')).boundingBox(); await page.mouse.click(b.x + 300, b.y + 300); await page.waitForSelector('.obj-check');
-await page.click('[data-tool="note"]'); await page.mouse.click(b.x + 500, b.y + 300); await page.waitForSelector('.notepop textarea'); await page.keyboard.type('moved note'); await page.keyboard.press('Escape');
+await page.click('#tools [data-tool="check"]'); const b = await (await page.$('.sheet')).boundingBox(); await page.mouse.click(b.x + 300, b.y + 300); await page.waitForSelector('.obj-check');
+await page.click('#tools [data-tool="note"]'); await page.mouse.click(b.x + 500, b.y + 300); await page.waitForSelector('.notepop textarea'); await page.keyboard.type('moved note'); await page.keyboard.press('Escape');
 out.before = await tabs(page);
 // right-click menu: Open in new window
 await page.click('#tabs .tab:nth-child(2)', { button: 'right' }); await page.waitForSelector('.tabmenu');
