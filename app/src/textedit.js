@@ -2,8 +2,8 @@
 // tells us which operators drew them. Lifting a block removes those operators from the page and
 // hands back a text object with the same wording, size, color and font family, which the editor
 // then treats like any text it added itself. Pure pdf-lib + content.js: no DOM, so tests run in Node.
-import { PDFDocument, PDFName, PDFArray, PDFDict, PDFNumber, PDFRef, PDFStream, StandardFonts, decodePDFRawStream } from 'pdf-lib';
-import { walkText, removeOps } from './content.js';
+import { PDFDocument, PDFName, PDFArray, PDFDict, PDFNumber, PDFRef, PDFStream, PDFRawStream, StandardFonts, decodePDFRawStream } from 'pdf-lib';
+import { walkText, removeOps, rewriteOps } from './content.js';
 import { measureItems, groupBlocks, finishBlock } from './blocks.js';
 
 const PN = k => PDFName.of(k);
@@ -91,7 +91,8 @@ export function chooseFont(info, FONTS) {
 export function pageContent(doc, page) {
   const ctx = doc.context, c = page.node.Contents(); if (!c) return { bytes: new Uint8Array(0), refs: [] };
   const refs = c instanceof PDFArray ? c.asArray() : [c]; const chunks = [];
-  for (const r of refs) { const st = ctx.lookup(r); if (st instanceof PDFStream) { chunks.push(decodePDFRawStream(st).decode(), Uint8Array.of(10)); } }
+  // a stream pdf-lib itself added in this session (flattened fields, drawn items) is not a raw stream yet
+  for (const r of refs) { const st = ctx.lookup(r); if (st instanceof PDFRawStream) chunks.push(decodePDFRawStream(st).decode(), Uint8Array.of(10)); else if (st instanceof PDFStream && typeof st.getUnencodedContents === 'function') chunks.push(st.getUnencodedContents(), Uint8Array.of(10)); }
   const n = chunks.reduce((a, b) => a + b.length, 0), out = new Uint8Array(n); let o = 0; for (const ch of chunks) { out.set(ch, o); o += ch.length; }
   return { bytes: out, refs };
 }
@@ -168,4 +169,96 @@ export function restoreContents(doc, rec) {
   if (rec.kind === 'annots') { if (rec.prev) node.set(PN('Annots'), rec.prev); else node.delete(PN('Annots')); return; } // a mark taken out of the file (annots.js)
   if (rec.prev) node.set(PN('Contents'), rec.prev); else node.delete(PN('Contents'));
   if (rec.ref instanceof PDFRef) doc.context.delete(rec.ref);
+}
+
+/* ---------- white-out and eraser: the words underneath leave the file ---------- */
+const hexOf = b => { let h = ''; for (const c of b) h += c.toString(16).padStart(2, '0'); return '<' + h + '>'; };
+const fmt = v => (Math.round(v * 100) / 100).toString();
+/* Is page point q inside region r (a white-out box, or within an eraser stroke)? */
+export function inRegion(r, q) {
+  if (r.kind === 'rect') { const A = (r.a || 0) * Math.PI / 180, c = Math.cos(A), s = Math.sin(A), dx = q[0] - r.x, dy = q[1] - r.y, u = dx * c + dy * s, v = dx * s - dy * c; return u >= 0 && u <= r.w && v >= 0 && v <= r.h; }
+  const pts = r.pts || [], tol = (r.width || 0) / 2;
+  for (let i = 1; i < pts.length; i++) {
+    const [ax, ay] = pts[i - 1], [bx, by] = pts[i], vx = bx - ax, vy = by - ay, L = vx * vx + vy * vy || 1;
+    const t = Math.max(0, Math.min(1, ((q[0] - ax) * vx + (q[1] - ay) * vy) / L));
+    if (Math.hypot(q[0] - (ax + t * vx), q[1] - (ay + t * vy)) <= tol) return true;
+  }
+  return pts.length === 1 && Math.hypot(q[0] - pts[0][0], q[1] - pts[0][1]) <= tol;
+}
+function regionBox(r) {
+  if (r.kind === 'rect') { const A = (r.a || 0) * Math.PI / 180, c = Math.cos(A), s = Math.sin(A); const cs = [[0, 0], [r.w, 0], [0, r.h], [r.w, r.h]].map(([u, v]) => [r.x + u * c + v * s, r.y + u * s - v * c]); return [Math.min(...cs.map(p => p[0])), Math.min(...cs.map(p => p[1])), Math.max(...cs.map(p => p[0])), Math.max(...cs.map(p => p[1]))]; }
+  const t = (r.width || 0) / 2, xs = r.pts.map(p => p[0]), ys = r.pts.map(p => p[1]); return [Math.min(...xs) - t, Math.min(...ys) - t, Math.max(...xs) + t, Math.max(...ys) + t];
+}
+/* The glyphs of one operator with their span along the baseline (same units as op.adv) and center on the page. */
+export function opGlyphs(op, font) {
+  if (!font || !font.adv || !op.sx || !(op.tfs * op.th)) return null;
+  const step = font.twoByte ? 2 : 1, out = []; let cur = 0;
+  const nx = -op.dir[1], ny = op.dir[0], up = op.size * 0.35;
+  for (const part of op.parts || []) {
+    if (typeof part === 'number') { cur -= part / 1000 * op.tfs * op.th; continue; }
+    if (!(part instanceof Uint8Array)) continue;
+    for (let i = 0; i + step - 1 < part.length; i += step) {
+      const code = part.subarray(i, i + step), a = font.adv(code); if (!a) return null;
+      const gw = (a.w * op.tfs + a.n * op.tc + a.spaces * op.tw) * op.th, mid = (cur + gw / 2) * op.sx;
+      out.push({ part, i, gw, center: [op.pos[0] + op.dir[0] * mid + nx * up, op.pos[1] + op.dir[1] * mid + ny * up] });
+      cur += gw;
+    }
+  }
+  return out;
+}
+/* Remove the glyphs whose centers fall in the regions. Partly covered operators are rewritten as a TJ
+   array with a kerning number in place of the removed glyphs, so the rest of the line keeps its place.
+   Returns { removed, flagged }: flagged means something under a region may remain (text drawn through
+   a form XObject, or a font whose widths are unknown), so the caller can say so. */
+export async function scrubText(doc, page, regions) {
+  if (!regions.length) return { removed: 0, flagged: false };
+  const fonts = await pageFonts(doc, page), { bytes } = pageContent(doc, page);
+  const fontOf = name => fonts.get(name) || null;
+  const boxes = regions.map(regionBox), covered = q => regions.some(r => inRegion(r, q));
+  const overlaps = b => boxes.some(x => b[0] <= x[2] && b[2] >= x[0] && b[1] <= x[3] && b[3] >= x[1]);
+  let flagged = false;
+  // text inside a form XObject placed over a region cannot be reached from here
+  const check = ops => {
+    let xo = null; try { xo = page.node.Resources()?.lookup(PN('XObject')); } catch {}
+    for (const d of ops.xobjs || []) {
+      let dict = null; try { dict = xo instanceof PDFDict ? doc.context.lookup(xo.get(PN(d.name))) : null; } catch {}
+      if (!(dict instanceof PDFStream) || String(dict.dict.get(PN('Subtype')) || '') !== '/Form') continue;
+      let bb = [0, 0, 1, 1], mt = [1, 0, 0, 1, 0, 0];
+      try { const b = dict.dict.lookup(PN('BBox')); if (b instanceof PDFArray) bb = b.asArray().map(v => numOf(doc.context.lookup(v))); const m = dict.dict.lookup(PN('Matrix')); if (m instanceof PDFArray) mt = m.asArray().map(v => numOf(doc.context.lookup(v))); } catch {}
+      const tr = (m, q) => [m[0] * q[0] + m[2] * q[1] + m[4], m[1] * q[0] + m[3] * q[1] + m[5]];
+      const cs = [[bb[0], bb[1]], [bb[2], bb[1]], [bb[0], bb[3]], [bb[2], bb[3]]].map(q => tr(d.ctm, tr(mt, q)));
+      if (overlaps([Math.min(...cs.map(c => c[0])), Math.min(...cs.map(c => c[1])), Math.max(...cs.map(c => c[0])), Math.max(...cs.map(c => c[1]))])) flagged = true;
+    }
+  };
+  const ops = walkText(bytes, fontOf); check(ops);
+  const remove = new Set(), replace = new Map(); let removed = 0;
+  for (const op of ops) {
+    if (!op.strings.length) continue;
+    const g = op.known ? opGlyphs(op, fontOf(op.fontName)) : null;
+    if (!g) { if (covered(op.pos)) flagged = true; continue; }
+    const gone = g.map(x => covered(x.center)); if (!gone.some(Boolean)) continue;
+    if (gone.every(Boolean)) { remove.add(op.i); removed += g.length; continue; }
+    // rewrite: kept runs as hex strings, removed runs as a kerning number of the same width
+    const items = []; let pend = 0, k = 0;
+    const flush = () => { if (pend) { items.push(fmt(-pend / (op.tfs * op.th) * 1000)); pend = 0; } };
+    for (const part of op.parts) {
+      if (typeof part === 'number') { flush(); items.push(fmt(part)); continue; }
+      if (!(part instanceof Uint8Array)) continue;
+      let run = [];
+      const endRun = () => { if (run.length) { flush(); items.push(hexOf(run)); run = []; } };
+      for (let i = 0; i < part.length;) { const gl = g[k]; if (!gl || gl.part !== part || gl.i !== i) break; const n = gl.part === part ? (g[k + 1] && g[k + 1].part === part ? g[k + 1].i - i : part.length - i) : 1; if (gone[k]) { endRun(); pend += gl.gw; removed++; } else run.push(...part.subarray(i, i + n)); i += n; k++; }
+      endRun();
+    }
+    flush();
+    const pre = op.kind === '"' ? `${fmt(op.args[0])} Tw ${fmt(op.args[1])} Tc T* ` : op.kind === "'" ? 'T* ' : '';
+    replace.set(op.i, `${pre}[${items.join(' ')}] TJ`);
+  }
+  if (!remove.size && !replace.size) return { removed: 0, flagged };
+  const out = rewriteOps(bytes, ops, remove, replace);
+  // the gate: nothing with a known position may still sit under a region
+  const again = walkText(out, fontOf);
+  for (const op of again) { if (!op.strings.length) continue; const g = op.known ? opGlyphs(op, fontOf(op.fontName)) : null; if (g ? g.some(x => covered(x.center)) : covered(op.pos)) { flagged = true; break; } }
+  const ref = doc.context.register(doc.context.flateStream(out));
+  page.node.set(PN('Contents'), doc.context.obj([ref]));
+  return { removed, flagged };
 }

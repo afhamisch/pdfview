@@ -74,7 +74,7 @@ const cmykHex = (c, m, y, k) => rgbHex((1 - c) * (1 - k), (1 - m) * (1 - k), (1 
    Returns the text-showing operators in stream order: { i, kind, s, e, bt, pos, dir, size, fontName,
    tfs, th, tc, tw, tr, color, repos, known, adv, args, strings }. */
 export function walkText(bytes, fontOf) {
-  const ops = []; let stack = [], ctmStack = [], ctm = ID, tm = ID, tlm = ID;
+  const ops = [], xobjs = []; let stack = [], ctmStack = [], ctm = ID, tm = ID, tlm = ID;
   let tfs = 0, fontName = null, font = null, tc = 0, tw = 0, th = 1, tl = 0, ts = 0, tr = 0, color = '#000000';
   let bt = -1, repos = true, unknown = false, opStart = -1, arrDepth = 0, dictDepth = 0;
   const num = k => { const v = stack[stack.length - k]; return typeof v === 'number' ? v : 0; };
@@ -92,7 +92,7 @@ export function walkText(bytes, fontOf) {
     const trm = mul(mul([tfs * th, 0, 0, tfs, 0, ts], tm), ctm);
     const len = Math.hypot(trm[0], trm[1]) || 1;
     const adv = advance(parts);
-    ops.push({ i: ops.length, kind, s: opStart >= 0 ? opStart : tok.s, e: tok.e, bt, pos: [trm[4], trm[5]], dir: [trm[0] / len, trm[1] / len], size: Math.hypot(trm[2], trm[3]), fontName, tfs, th, tc, tw, tr, color, repos, known: !unknown, adv, args, strings: parts.filter(p => p instanceof Uint8Array) });
+    ops.push({ i: ops.length, kind, s: opStart >= 0 ? opStart : tok.s, e: tok.e, bt, pos: [trm[4], trm[5]], dir: [trm[0] / len, trm[1] / len], size: Math.hypot(trm[2], trm[3]), sx: tfs && th ? len / (tfs * th) : 0, fontName, tfs, th, tc, tw, tr, color, repos, known: !unknown, adv, args, parts, strings: parts.filter(p => p instanceof Uint8Array) });
     repos = false;
     if (adv == null) unknown = true; else tm = mul([1, 0, 0, 1, adv, 0], tm);
   };
@@ -113,6 +113,7 @@ export function walkText(bytes, fontOf) {
       case 'Q': if (ctmStack.length) ctm = ctmStack.pop(); break;
       case 'cm': if (stack.length >= 6) ctm = mul([num(6), num(5), num(4), num(3), num(2), num(1)], ctm); break;
       case 'BT': tm = tlm = ID; bt++; repos = true; unknown = false; break;
+      case 'Do': { const nm = stack[stack.length - 1]; if (nm && nm.name != null) xobjs.push({ name: nm.name, ctm }); break; }
       case 'Tf': { const nm = stack[stack.length - 2]; fontName = nm && nm.name != null ? nm.name : null; tfs = num(1); font = fontName != null && fontOf ? fontOf(fontName) : null; break; }
       case 'Td': td(num(2), num(1)); break;
       case 'TD': tl = -num(1); td(num(2), num(1)); break;
@@ -135,15 +136,19 @@ export function walkText(bytes, fontOf) {
     }
     stack = []; opStart = -1;
   }
+  ops.xobjs = xobjs;
   return ops;
 }
 
 /* Remove the given operators (by index). Everything that followed them stays in place: when a kept
    operator on the same line relied on the removed text's advance, a kerning-only TJ of the same width
    takes its place; if the width cannot be known the text stays but is made invisible. */
-export function removeOps(bytes, ops, remove) {
+export function removeOps(bytes, ops, remove) { return rewriteOps(bytes, ops, remove); }
+/* Remove some operators and replace others (opIndex -> replacement text, e.g. a rewritten TJ). */
+export function rewriteOps(bytes, ops, remove, replace = new Map()) {
   const parts = []; let at = 0; const f = v => (Math.round(v * 100) / 100).toString();
   for (const op of ops) {
+    if (replace.has(op.i)) { parts.push(bytes.subarray(at, op.s), new TextEncoder().encode(replace.get(op.i) + '\n')); at = op.e; continue; }
     if (!remove.has(op.i)) continue;
     let needComp = false;
     for (let j = op.i + 1; j < ops.length && ops[j].bt === op.bt; j++) { if (ops[j].repos) break; if (!remove.has(ops[j].i)) { needComp = true; break; } }

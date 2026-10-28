@@ -435,6 +435,12 @@ export function setTool(t) {
 const COLORS = [['#111111', 'Black'], ['#1a3a8f', 'Blue'], ['#b3261e', 'Red']];
 const today = () => new Date().toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
 export const STAMPS = ['EXHIBIT A', 'EXHIBIT B', 'EXHIBIT 1', 'FILED', 'RECEIVED ' + today(), 'CONFIDENTIAL', 'COPY', 'DRAFT', 'COMPOSITE EXHIBIT'];
+/* The switch for white-out and the eraser: the words underneath leave the file on save. */
+function scrubBox() {
+  const cb = el('input', { type: 'checkbox', id: 'scrubChk' }); cb.checked = S.scrub !== false;
+  cb.addEventListener('change', () => { S.scrub = cb.checked; markDirty(); });
+  return el('label', { class: 'chk', title: 'Text under the box or stroke is taken out of the saved file, not just covered. Pictures and lines are covered only; use Redact when everything must go.' }, cb, el('span', { text: 'Remove the words underneath when saving' }));
+}
 function renderCtx(c) {
   const o = S.sel != null && S.objects.find(x => x.id === S.sel);
   if (!o && asel) {
@@ -453,7 +459,7 @@ function renderCtx(c) {
       custom.addEventListener('input', () => { S.stamp = custom.value.trim() || 'STAMP'; });
       c.append(sel, custom, el('span', { text: 'then click on the page to place it.' })); return true;
     }
-    if (S.tool === 'highlight' || S.tool === 'whiteout' || S.tool === 'redact') { c.append(el('span', { text: `Drag a box on the page, or select text and press ${S.tool === 'highlight' ? 'H' : S.tool === 'whiteout' ? 'W' : 'R'} again to mark the selection.` })); return true; }
+    if (S.tool === 'highlight' || S.tool === 'whiteout' || S.tool === 'redact') { c.append(el('span', { text: `Drag a box on the page, or select text and press ${S.tool === 'highlight' ? 'H' : S.tool === 'whiteout' ? 'W' : 'R'} again to mark the selection.` })); if (S.tool === 'whiteout') c.append(scrubBox()); return true; }
     if (S.tool === 'draw') {
       c.append(el('span', { class: 'lbl', text: 'Marker' }));
       const mode = el('select', { class: 'ctl', 'aria-label': 'Marker type' }); [['marker', 'Highlighter (see-through)'], ['pen', 'Pen (solid)']].forEach(([v, t]) => mode.append(el('option', { value: v, text: t }))); mode.value = S.ink.mode; mode.addEventListener('change', () => { S.ink.mode = mode.value; emit('ctx'); });
@@ -473,7 +479,7 @@ function renderCtx(c) {
     if (S.tool === 'erase') {
       c.append(el('span', { class: 'lbl', text: 'Eraser' }));
       const width = el('select', { class: 'ctl', 'aria-label': 'Eraser size' }); [[4, 'Small'], [10, 'Medium'], [20, 'Large'], [40, 'Very large']].forEach(([v, t]) => width.append(el('option', { value: v, text: t }))); width.value = S.ink.eraseWidth; width.addEventListener('change', () => { S.ink.eraseWidth = +width.value; });
-      c.append(width, el('span', { text: 'Drag over the part you want gone. A highlight, drawing or shape it crosses is removed, ours or one made in another program. Over page content it paints white; use Redact when the content must be removed for good.' })); return true;
+      c.append(width, el('span', { text: 'Drag over the part you want gone. A highlight, drawing or shape it crosses is removed. Over page content it paints white.' }), scrubBox()); return true;
     }
     if (S.tool === 'snap') {
       c.append(el('span', { class: 'lbl', text: 'Snapshot' }));
@@ -492,6 +498,7 @@ function renderCtx(c) {
   }
   c.append(el('span', { class: 'lbl', text: { text: o.box ? 'Stamp' : 'Text', check: 'Check mark', image: 'Signature', highlight: 'Highlight', note: 'Note', whiteout: 'White-out', redact: 'Redaction', field: 'Signature field', ink: o.mode === 'marker' ? 'Marker stroke' : o.mode === 'erase' ? 'Eraser stroke' : 'Pen stroke', shape: { line: 'Line', arrow: 'Arrow', rect: 'Rectangle', ellipse: 'Ellipse' }[o.kind] }[o.type] }));
   if (o.type === 'redact') c.append(el('span', { text: 'Content under this box is permanently removed when you save.', style: { color: 'var(--redline)' } }));
+  if (o.type === 'whiteout' || (o.type === 'ink' && o.mode === 'erase')) c.append(scrubBox());
   if (o.type === 'note') { [['#ffd400', 'Yellow'], ['#8fd3ff', 'Blue'], ['#b6f2a1', 'Green'], ['#ffb3c7', 'Pink']].forEach(([hex, name]) => { const b = el('button', { class: 'sw', type: 'button', title: name, 'aria-label': name, 'aria-pressed': String(o.color === hex), style: { background: hex } }); b.addEventListener('pointerdown', e => e.preventDefault()); b.addEventListener('click', () => { pushUndo(); o.color = hex; S.noteColor = hex; renderObjs(PG(o.page)); markDirty(); emit('ctx'); }); c.append(b); }); c.append(el('span', { class: 'hint', text: 'Saved as a comment that Adobe and other viewers show. Drag the icon to move it.' })); }
   if (o.type === 'text' && !o.box) {
     textToolbar(c, o, { onChange: mut => { pushUndo(); mut(o); S.tsize = o.size; S.tcolor = o.color; const { font, bold, italic, underline, align, list } = o; S.textStyle = { font, bold, italic, underline, align, list }; const wasEditing = S.editing === o.id; renderObjs(PG(o.page)); markDirty(); emit('ctx'); if (wasEditing) startEdit(o); } });

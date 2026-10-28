@@ -7,6 +7,7 @@ import { S, on, emit, coveredWords } from './state.js';
 import { offset, rotOf } from './geometry.js';
 import { $, el, toast, plural } from './ui.js';
 import { EDIT_KEY, hash } from './document.js';
+import { scrubText, inRegion } from './textedit.js';
 import { batesBox } from './bates.js';
 import { markDirty } from './editor.js';
 import { layoutLines, boxWidth, PAD, baselineAt } from './textstyle.js';
@@ -94,7 +95,11 @@ async function sourceBytes(src) {
 }
 
 /* Build the output PDF. Returns { bytes, redacted }. */
+/* White-out boxes and eraser strokes as regions whose text leaves the file (see textedit.js). */
+const scrubRegions = objs => objs.filter(o => o.type === 'whiteout').map(o => ({ kind: 'rect', x: o.x, y: o.y, w: o.w, h: o.h, a: o.a || 0 })).concat(objs.filter(o => o.type === 'ink' && o.mode === 'erase').map(o => ({ kind: 'stroke', pts: o.pts, width: o.width })));
+let scrubNote = { pages: [], flagged: [] }; // what the last build removed, for the save message
 export async function buildPdf({ editLayer = true, transfer = false } = {}) {
+  scrubNote = { pages: [], flagged: [] };
   const doc = await PDFDocument.load(await sourceBytes(S.sources.get(0)), { ignoreEncryption: true, updateMetadata: false });
   const helv = await doc.embedFont(StandardFonts.Helvetica), helvB = await doc.embedFont(StandardFonts.HelveticaBold);
   const fontCache = new Map([['helv', helv], ['helv:b', helvB]]);
@@ -137,12 +142,16 @@ export async function buildPdf({ editLayer = true, transfer = false } = {}) {
     if (p.rot) page.setRotation(degrees(rotOf(p)));
     const objs = S.objects.filter(x => x.page === p.uid && x.type !== 'field');
     const bx = S.bates ? batesBox(p, idx, S.bates, (s, size) => helv.widthOfTextAtSize(s, size)) : null;
+    // words under white-out or an eraser stroke come out of the page content before anything is added
+    const regs = !transfer && S.scrub !== false && !objs.some(o => o.type === 'redact') ? scrubRegions(objs) : [];
+    if (regs.length) { try { const r = await scrubText(doc, page, regs); if (r.removed) scrubNote.pages.push(idx + 1); if (r.flagged) scrubNote.flagged.push(idx + 1); } catch (e) { console.warn('scrub', e); scrubNote.flagged.push(idx + 1); } }
     if (p.ocr && p.ocr.words.length) {
       // recognized text goes in as invisible text so the file is searchable elsewhere; it does not change the page's look
       page.getContentStream(false);
       const hiddenWords = coveredWords(p);
       for (const [wi, wd] of p.ocr.words.entries()) {
         if (hiddenWords.has(wi)) continue; // edited away: the white-out covers it and the typed text replaces it
+        if (regs.length) { const cen = offset(wd.tl, p.ocr.rot, wd.w / 2, wd.h / 2); if (regs.some(r => inRegion(r, cen))) continue; } // under white-out: not written
         const t = clean(wd.text, helv); if (!t.trim()) continue;
         const size = Math.max(2, Math.min(72, wd.h * 0.85)); const b = offset(wd.tl, p.ocr.rot, 0, wd.h * 0.8);
         page.drawText(t, { x: b[0], y: b[1], size, font: helv, color: rgb(0, 0, 0), opacity: 0, rotate: degrees(p.ocr.rot) });
@@ -240,7 +249,10 @@ export async function save(confirmed, as = false) {
     if (r.name && r.name !== S.name && !r.download) { S.name = r.name; emit('tabs:changed'); }
     S.dirty = false; $('#dirtyDot').hidden = true; emit('dirty');
     const filename = r.name || S.name;
-    toast(redacted ? `Saved ${filename} with ${plural(rst.n, 'redaction')} applied.` : r.download ? `Saved ${filename} to your downloads.` : `Saved ${filename}.`);
+    let msg = redacted ? `Saved ${filename} with ${plural(rst.n, 'redaction')} applied.` : r.download ? `Saved ${filename} to your downloads.` : `Saved ${filename}.`;
+    if (scrubNote.pages.length) msg += ` Words under white-out removed on page${scrubNote.pages.length > 1 ? 's' : ''} ${scrubNote.pages.join(', ')}.`;
+    if (scrubNote.flagged.length) msg += ` Page${scrubNote.flagged.length > 1 ? 's' : ''} ${scrubNote.flagged.join(', ')}: some content under the white-out could not be taken out of the file; use Redact there if it must go.`;
+    toast(msg, scrubNote.flagged.length ? 9000 : scrubNote.pages.length ? 6000 : undefined);
   } catch (e) { console.error(e); toast('This PDF could not be saved. It may be encrypted or damaged.'); }
   finally { busy = false; S.saving = false; btn.disabled = false; }
 }
