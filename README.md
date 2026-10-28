@@ -64,6 +64,14 @@ button opens Settings: which build is running and, in the desktop app, a Check
 for updates button; the theme; the name written on your notes; and the
 envelope service token when the app is served by the server.
 
+White-out and the eraser take the words underneath out of the saved file, not
+just cover them: the glyphs under the box or stroke leave the page's content
+stream and the rest of the line keeps its place (recognized words on scanned
+pages are left out of the file too). Pictures and lines are only covered, and
+text drawn through an embedded form is reported in the save message; use
+Redact when everything under an area must go. The switch is on the White-out
+and Eraser strips.
+
 Marks made in another program (highlights, drawings, boxes, notes) can be
 removed: click one with Select and press Delete, or drag the eraser across it.
 The eraser also removes PDFView's own highlights, drawings and shapes it

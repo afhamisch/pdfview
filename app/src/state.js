@@ -8,6 +8,7 @@ export const S = {
   tool: 'select', objects: [], sel: null, editing: null, undo: [], redo: [], dirty: false,
   sig: null, tsize: 11, tcolor: '#111111', stamp: '', ink: { mode: 'marker', width: 8, markerColor: '#ffd400', penColor: '#111111', eraseWidth: 10 }, shape: { kind: 'arrow', width: 2, color: '#b3261e' }, snap: null, textStyle: { font: 'helv', bold: false, italic: false, underline: false, align: 'left', list: 'none' },
   org: false, osel: new Set(), anchor: null, orgReturn: null,
+  scrub: true,           // white-out and eraser take the words underneath out of the file when saving
   lifts: [], lib: null, hover: null, lifting: false, // text lifted off the page for editing (see textedit.js): undo records and the cached pdf-lib document
   bates: null,           // { prefix, start, pad, corner, size } or null
   meta: {},              // misc: outline, title
@@ -17,7 +18,7 @@ export const S = {
   tabs: [], tab: null    // open documents (see tabs.js); the fields in DOC_KEYS belong to the active tab
 };
 // Everything that belongs to one open document rather than to the app.
-export const DOC_KEYS = ['doc', 'bytes', 'name', 'sample', 'sources', 'pages', 'reg', 'scale', 'fit', 'objects', 'sel', 'editing', 'undo', 'dirty', 'bates', 'meta', 'formDirty', 'lifts', 'lib', 'hover', 'lifting', 'org', 'osel', 'anchor', 'orgReturn', 'snap', 'file', 'redo'];
+export const DOC_KEYS = ['doc', 'bytes', 'name', 'sample', 'sources', 'pages', 'reg', 'scale', 'fit', 'objects', 'sel', 'editing', 'undo', 'dirty', 'bates', 'meta', 'formDirty', 'lifts', 'lib', 'hover', 'lifting', 'org', 'osel', 'anchor', 'orgReturn', 'snap', 'file', 'redo', 'scrub'];
 export const bus = new EventTarget();
 if (typeof window !== 'undefined') window.__pdfview = S; // read-only peek for tests and debugging
 /* Which build this is: the desktop wrapper fills in its release version; every build carries its date. */
