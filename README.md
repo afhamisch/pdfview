@@ -64,6 +64,11 @@ button opens Settings: which build is running and, in the desktop app, a Check
 for updates button; the theme; the name written on your notes; and the
 envelope service token when the app is served by the server.
 
+Marks made in another program (highlights, drawings, boxes, notes) can be
+removed: click one with Select and press Delete, or drag the eraser across it.
+The eraser also removes PDFView's own highlights, drawings and shapes it
+crosses; over page content it paints white. Undo brings a removed mark back.
+
 A placing tool (Text, Stamp, Check, Note) stays active after each placement
 so you can add several in a row; with the Text tool, clicking existing text
 edits it. Escape or Select ends the tool. Undo and Redo (Ctrl+Z, Ctrl+Y). Hold Shift while drawing with the marker for

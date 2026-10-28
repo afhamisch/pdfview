@@ -165,6 +165,7 @@ export function removeBlock(doc, pageIndex, analysis, bl) {
 }
 export function restoreContents(doc, rec) {
   const node = doc.getPage(rec.pageIndex).node;
+  if (rec.kind === 'annots') { if (rec.prev) node.set(PN('Annots'), rec.prev); else node.delete(PN('Annots')); return; } // a mark taken out of the file (annots.js)
   if (rec.prev) node.set(PN('Contents'), rec.prev); else node.delete(PN('Contents'));
   if (rec.ref instanceof PDFRef) doc.context.delete(rec.ref);
 }

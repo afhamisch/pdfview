@@ -64,7 +64,7 @@ body[data-tool="text"] .sheet{cursor:text}body[data-tool="stamp"] .sheet{cursor:
 body[data-tool="highlight"] .sheet,body[data-tool="whiteout"] .sheet,body[data-tool="redact"] .sheet,body[data-tool="draw"] .sheet,body[data-tool="snap"] .sheet,body[data-tool="shape"] .sheet,body[data-tool="erase"] .sheet{cursor:crosshair;touch-action:none}
 body[data-tool="draw"] .ocrLayer span,body[data-tool="snap"] .ocrLayer span,body[data-tool="shape"] .ocrLayer span,body[data-tool="erase"] .ocrLayer span{pointer-events:none}
 .textLayer .hit{background:rgba(255,200,0,.55);color:transparent;border-radius:2px}.textLayer .hit.cur{background:rgba(255,120,0,.7)}
-.obj{box-sizing:border-box}.obj.sel{outline:1.5px solid var(--acc);outline-offset:1px}
+body[data-tool="select"] .annotationLayer section:not([class*="idget"]):not(.linkAnnotation):not(.popupAnnotation){cursor:pointer}.annotationLayer section.asel{outline:2px solid var(--acc);outline-offset:2px}.obj{box-sizing:border-box}.obj.sel{outline:1.5px solid var(--acc);outline-offset:1px}
 .obj-text{cursor:move;min-width:12px;min-height:12px}.obj-text .txt{white-space:pre;font-family:Helvetica,Arial,sans-serif;line-height:1.2;outline:0;min-width:1ch;box-sizing:border-box}.obj-text .txt.list{white-space:pre-wrap}
 .fmtgrp{display:inline-flex;gap:2px}.mini.fmt{width:30px;padding:0;justify-content:center;font-family:Georgia,serif;font-size:14px}.mini.fmt svg{width:16px;height:16px}.mini.fmt[aria-pressed="true"]{background:var(--acc);color:var(--on-acc);border-color:var(--acc)}
 .sizein{-moz-appearance:textfield;text-align:center}.sizein::-webkit-outer-spin-button,.sizein::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}

@@ -10,6 +10,7 @@ import { initSignature } from './signature.js';
 import { ctxHooks, keyHooks } from './hooks.js';
 import { libDoc, reloadMain } from './document.js';
 import { analyzePage, removeBlock, restoreContents, chooseFont } from './textedit.js';
+import { markSection, markLabel, marksAt, deleteMarks } from './annots.js';
 import { buildBlocks, blockAt, blockRect } from './blocks.js';
 import { FONTS, PAD, LINE, baselineAt } from './textstyle.js';
 
@@ -152,7 +153,21 @@ function objEl(p, o) {
   d.addEventListener('pointerdown', e => objDown(p, o, e));
   return d;
 }
+/* A mark already in the file (see annots.js) that was clicked: { p, sec, id }. */
+let asel = null;
+function clearMark() { if (asel) { asel.sec.classList.remove('asel'); asel = null; } }
+function selectMark(p, sec) { clearMark(); if (S.sel != null) select(null); asel = { p, sec, id: sec.dataset.annotationId }; sec.classList.add('asel'); emit('ctx'); }
+async function removeMarks(p, secs, { quiet } = {}) {
+  const ids = secs.map(s => s.dataset.annotationId); if (!ids.length) return 0;
+  if (p.src !== 0) { toast('Marks on pages inserted from another file cannot be removed here.'); return 0; }
+  if (S.lifting) { toast('The page is still updating. Try again in a moment.'); return 0; }
+  S.lifting = true; clearMark();
+  try { const n = await deleteMarks(p, ids); if (!quiet) toast(n ? `Removed ${n === 1 ? 'the mark' : n + ' marks'} from the file. Undo brings ${n === 1 ? 'it' : 'them'} back.` : 'That mark could not be found in the file.'); emit('ctx'); return n; }
+  catch (e) { console.error(e); toast('That mark could not be removed.'); return 0; }
+  finally { S.lifting = false; }
+}
 export function select(id) {
+  if (id != null) clearMark();
   const prev = S.sel != null && S.sel !== id ? S.objects.find(x => x.id === S.sel) : null;
   if (prev && prev.type === 'note' && !(prev.text || '').trim()) S.objects = S.objects.filter(x => x !== prev); // an empty note is dropped when left
   S.sel = id; renderAllObjs(); emit('ctx');
@@ -228,10 +243,20 @@ export function removeSel() {
 }
 export const fieldHooks = { make: null }; // the envelope composer fills this when the field tool is active
 
+/* Is point q within tol of object o's box (o.x, o.y is the top-left corner, o.a its angle)? */
+function inObj(o, q, tol) { const { c, s } = frame(o.a || 0), dx = q[0] - o.x, dy = q[1] - o.y, u = dx * c + dy * s, v = dx * s - dy * c; return u >= -tol && u <= (o.w || 0) + tol && v >= -tol && v <= (o.h || 0) + tol; }
+function nearPath(pts, q, tol) {
+  for (let i = 1; i < pts.length; i++) {
+    const [ax, ay] = pts[i - 1], [bx, by] = pts[i], vx = bx - ax, vy = by - ay, L = vx * vx + vy * vy || 1;
+    const t = Math.max(0, Math.min(1, ((q[0] - ax) * vx + (q[1] - ay) * vy) / L));
+    if (Math.hypot(q[0] - (ax + t * vx), q[1] - (ay + t * vy)) <= tol) return true;
+  }
+  return pts.length === 1 && Math.hypot(q[0] - pts[0][0], q[1] - pts[0][1]) <= tol;
+}
 function sheetDown(p, e) {
   if (e.button > 0 || S.mode === 'sign') return;
   const P = toWorld(p, e), R = rotOf(p), tool = S.tool;
-  if (tool === 'select') { if (S.sel != null) select(null); return; }
+  if (tool === 'select') { if (S.sel != null) select(null); if (!markSection(e.target)) clearMark(); return; }
   if ((tool === 'highlight' || tool === 'whiteout' || tool === 'redact') && e.target.matches('.textLayer span, .ocrLayer span')) {
     // started on a word: let the browser select text, then mark the selection on release
     const up = () => { removeEventListener('pointerup', up); removeEventListener('pointercancel', up); setTimeout(() => { if (!markSelection(tool)) getSelection()?.removeAllRanges(); }, 0); };
@@ -276,6 +301,18 @@ function sheetDown(p, e) {
       removeEventListener('pointermove', mv); removeEventListener('pointerup', up); removeEventListener('pointercancel', up); svg.remove();
       if (pts.length < 2) pts.push([P[0] + 0.5, P[1]]);
       const xs = pts.map(q => q[0]), ys = pts.map(q => q[1]); const x0 = Math.min(...xs) - width, x1 = Math.max(...xs) + width, y0 = Math.min(...ys) - width, y1 = Math.max(...ys) + width;
+      if (mode === 'erase') {
+        // marks under the stroke go away instead of being painted over: ours first, then the file's
+        const hit = S.objects.filter(o => o.page === p.uid && o.type !== 'ink' ? ['highlight', 'whiteout', 'shape', 'redact'].includes(o.type) && pts.some(q => inObj(o, q, width / 2)) : o.page === p.uid && o.type === 'ink' && o.mode !== 'erase' && pts.some(q => nearPath(o.pts, q, (width + o.width) / 2)));
+        const sr = p.sheet.getBoundingClientRect(), secs = marksAt(p, pts.map(q => { const [vx, vy] = p.vp.convertToViewportPoint(q[0], q[1]); return [sr.left + vx, sr.top + vy]; }));
+        if (hit.length || secs.length) {
+          pushUndo();
+          if (hit.length) { S.objects = S.objects.filter(o => !hit.includes(o)); S.sel = null; renderObjs(p); markDirty(); hit.forEach(o => emit('obj:removed', o)); emit('ctx'); }
+          if (secs.length) removeMarks(p, secs, { quiet: true }).then(n => toast(`Removed ${hit.length + n === 1 ? 'the mark' : hit.length + n + ' marks'}. Undo brings ${hit.length + n === 1 ? 'it' : 'them'} back.`));
+          else toast(`Removed ${hit.length === 1 ? 'the mark' : hit.length + ' marks'}. Undo brings ${hit.length === 1 ? 'it' : 'them'} back.`);
+          return;
+        }
+      }
       pushUndo(); const o = addObj(p, { type: 'ink', mode, width, color, pts, x: x0, y: y1, w: x1 - x0, h: y1 - y0, a: 0 }); S.sel = null; renderObjs(p); emit('ctx');
     };
     addEventListener('pointermove', mv); addEventListener('pointerup', up); addEventListener('pointercancel', up);
@@ -389,6 +426,7 @@ export function setTool(t) {
   if (t === 'sign' && !S.sig) { openSig().then(sig => { if (sig) { S.sig = sig; setTool('sign'); toast('Click on the page where the signature goes.'); } }); return; }
   if (S.tool === 'snap' && t !== 'snap') clearSnap();
   if (t !== 'text') clearHover();
+  clearMark();
   S.tool = t; document.body.dataset.tool = t;
   $$('#tools [data-tool]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.tool === t)));
   if (t !== 'select' && S.sel != null) { S.sel = null; renderAllObjs(); }
@@ -399,6 +437,11 @@ const today = () => new Date().toLocaleDateString('en-US', { month: '2-digit', d
 export const STAMPS = ['EXHIBIT A', 'EXHIBIT B', 'EXHIBIT 1', 'FILED', 'RECEIVED ' + today(), 'CONFIDENTIAL', 'COPY', 'DRAFT', 'COMPOSITE EXHIBIT'];
 function renderCtx(c) {
   const o = S.sel != null && S.objects.find(x => x.id === S.sel);
+  if (!o && asel) {
+    c.append(el('span', { class: 'lbl', text: markLabel(asel.sec) + ' (in the file)' }), el('span', { text: 'Made in another program.' }));
+    const d = el('button', { class: 'mini danger', type: 'button', id: 'delMark', text: 'Delete', onclick: () => { const a = asel; pushUndo(); removeMarks(a.p, [a.sec]); } }); d.addEventListener('pointerdown', e => e.preventDefault()); c.append(d);
+    return true;
+  }
   if (!o) {
     if (S.tool === 'sign' && S.sig) { c.append(el('span', { text: 'Click on the page to place your signature.' }), el('button', { class: 'mini', type: 'button', text: 'Change signature', onclick: () => openSig().then(s => { if (s) S.sig = s; }) })); return true; }
     if (S.tool === 'stamp') {
@@ -430,7 +473,7 @@ function renderCtx(c) {
     if (S.tool === 'erase') {
       c.append(el('span', { class: 'lbl', text: 'Eraser' }));
       const width = el('select', { class: 'ctl', 'aria-label': 'Eraser size' }); [[4, 'Small'], [10, 'Medium'], [20, 'Large'], [40, 'Very large']].forEach(([v, t]) => width.append(el('option', { value: v, text: t }))); width.value = S.ink.eraseWidth; width.addEventListener('change', () => { S.ink.eraseWidth = +width.value; });
-      c.append(width, el('span', { text: 'Drag over the part you want gone. It is painted white in the saved copy, so it suits white paper; use Redact when the content must be removed for good.' })); return true;
+      c.append(width, el('span', { text: 'Drag over the part you want gone. A highlight, drawing or shape it crosses is removed, ours or one made in another program. Over page content it paints white; use Redact when the content must be removed for good.' })); return true;
     }
     if (S.tool === 'snap') {
       c.append(el('span', { class: 'lbl', text: 'Snapshot' }));
@@ -497,17 +540,19 @@ export function init() {
   }));
   $('#undoBtn').addEventListener('click', undo); $('#redoBtn').addEventListener('click', redo);
   $('#pages').addEventListener('pointermove', hoverMove); $('#pages').addEventListener('pointerleave', clearHover);
+  $('#pages').addEventListener('pointerdown', e => { if (S.tool !== 'select' || e.button > 0 || S.org) return; const sec = markSection(e.target); if (!sec) return; const pg = e.target.closest('.pg'), p = pg && PG(+pg.dataset.uid); if (!p) return; e.preventDefault(); selectMark(p, sec); });
   on('doc:open', () => { setTool('select'); clearHover(); syncUndo(); $('#flatten').disabled = false; });
   on('tab:switch', () => { setTool('select'); clearHover(); syncUndo(); $('#flatten').disabled = false; renderAllObjs(); });
   on('select:obj', id => { if (S.objects.some(o => o.id === id)) select(id); });
-  on('doc:close', () => { setTool('select'); $('#flatten').disabled = true; $('#flatten').checked = false; });
+  on('doc:close', () => { clearMark(); setTool('select'); $('#flatten').disabled = true; $('#flatten').checked = false; });
   keyHooks.push((e, { typing, mod }) => {
     if (anyModalOpen() || S.mode === 'sign') return false;
     if (mod && e.key.toLowerCase() === 'z' && !typing) { e.preventDefault(); if (e.shiftKey) redo(); else undo(); return true; }
     if (mod && e.key.toLowerCase() === 'y' && !typing) { e.preventDefault(); redo(); return true; }
     if (typing || S.org) return false;
+    if ((e.key === 'Delete' || e.key === 'Backspace') && asel) { e.preventDefault(); const a = asel; pushUndo(); removeMarks(a.p, [a.sec]); return true; }
     if ((e.key === 'Delete' || e.key === 'Backspace') && S.sel != null) { e.preventDefault(); removeSel(); return true; }
-    if (e.key === 'Escape') { if (S.sel != null) select(null); if (S.tool !== 'select') setTool('select'); return true; }
+    if (e.key === 'Escape') { if (asel) { clearMark(); emit('ctx'); return true; } if (S.sel != null) select(null); if (S.tool !== 'select') setTool('select'); return true; }
     if (mod || e.altKey) return false;
     const k = { v: 'select', t: 'text', m: 'stamp', k: 'check', s: 'sign', h: 'highlight', c: 'note', d: 'draw', a: 'shape', e: 'erase', w: 'whiteout', r: 'redact', n: 'snap' }[e.key.toLowerCase()];
     if (k && S.doc) { if ((k === 'highlight' || k === 'whiteout' || k === 'redact') && markSelection(k)) return true; setTool(k); return true; }
