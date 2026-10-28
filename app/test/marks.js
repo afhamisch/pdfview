@@ -51,5 +51,7 @@ const [dl] = await Promise.all([page.waitForEvent('download'), page.click('#save
 const saved = await PDFDocument.load(await readFile(await dl.path()), { ignoreEncryption: true });
 const types = []; try { const a = saved.getPage(0).node.lookup(PDFName.of('Annots'), PDFArray); for (let i = 0; i < a.size(); i++) types.push(String(a.lookup(i, PDFDict).get(PDFName.of('Subtype')))); } catch {}
 out.savedAnnots = types.filter(t => !/Widget/.test(t));
+const rawSaved = Buffer.from(await readFile(await dl.path())).toString('latin1'); let orphan = 0; for (const [, o] of saved.context.enumerateIndirectObjects()) if (o instanceof PDFDict && /Highlight|Square/.test(String(o.get(PDFName.of('Subtype')) || ''))) orphan++;
+out.noTrace = { rawHighlight: rawSaved.includes('/Highlight'), rawSquare: rawSaved.includes('/Square'), orphanDicts: orphan };
 console.log(JSON.stringify(out, null, 1)); console.log(logs.join('\n'));
 await browser.close();

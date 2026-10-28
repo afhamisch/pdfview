@@ -262,3 +262,17 @@ export async function scrubText(doc, page, regions) {
   page.node.set(PN('Contents'), doc.context.obj([ref]));
   return { removed, flagged };
 }
+
+/* Drop every object nothing reaches from the trailer: content streams and annotations that were
+   replaced or removed would otherwise be written out unreferenced, text and all. */
+export function collectGarbage(doc) {
+  const ctx = doc.context, seen = new Set(), stack = [ctx.trailerInfo.Root, ctx.trailerInfo.Info, ctx.trailerInfo.Encrypt, ctx.trailerInfo.ID].filter(Boolean);
+  while (stack.length) {
+    const o = stack.pop();
+    if (o instanceof PDFRef) { if (seen.has(o.tag)) continue; seen.add(o.tag); const v = ctx.indirectObjects.get(o); if (v) stack.push(v); continue; }
+    if (o instanceof PDFDict) { for (const [, v] of o.entries()) stack.push(v); }
+    else if (o instanceof PDFArray) { for (let i = 0; i < o.size(); i++) stack.push(o.get(i)); }
+    else if (o instanceof PDFStream) stack.push(o.dict);
+  }
+  for (const [ref] of ctx.enumerateIndirectObjects()) if (!seen.has(ref.tag)) ctx.delete(ref);
+}

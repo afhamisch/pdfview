@@ -7,7 +7,7 @@ import { S, on, emit, coveredWords } from './state.js';
 import { offset, rotOf } from './geometry.js';
 import { $, el, toast, plural } from './ui.js';
 import { EDIT_KEY, hash } from './document.js';
-import { scrubText, inRegion } from './textedit.js';
+import { scrubText, inRegion, collectGarbage } from './textedit.js';
 import { batesBox } from './bates.js';
 import { markDirty } from './editor.js';
 import { layoutLines, boxWidth, PAD, baselineAt } from './textstyle.js';
@@ -75,17 +75,6 @@ async function applyRedactions(doc, idxs, rectsAt) {
   try { const nm = cat.lookup(PN('Names')); if (nm instanceof PDFDict) ['EmbeddedFiles', 'JavaScript'].forEach(k => nm.delete(PN(k))); } catch {}
   try { const info = doc.context.lookup(doc.context.trailerInfo.Info); if (info instanceof PDFDict) ['Title', 'Author', 'Subject', 'Keywords', 'Creator'].forEach(k => info.delete(PN(k))); } catch {}
   doc.getPages().forEach(p => { let a; try { a = p.node.lookup(PN('Annots'), PDFArray); } catch { return; } if (!a) return; for (let i = a.size() - 1; i >= 0; i--) { try { const an = a.lookup(i, PDFDict); if (String(an.lookup(PN('Subtype'))) === '/FileAttachment') a.remove(i); } catch {} } });
-}
-function collectGarbage(doc) {
-  const ctx = doc.context, seen = new Set(), stack = [ctx.trailerInfo.Root, ctx.trailerInfo.Info, ctx.trailerInfo.Encrypt, ctx.trailerInfo.ID].filter(Boolean);
-  while (stack.length) {
-    const o = stack.pop();
-    if (o instanceof PDFRef) { if (seen.has(o.tag)) continue; seen.add(o.tag); const v = ctx.indirectObjects.get(o); if (v) stack.push(v); continue; }
-    if (o instanceof PDFDict) { for (const [, v] of o.entries()) stack.push(v); }
-    else if (o instanceof PDFArray) { for (let i = 0; i < o.size(); i++) stack.push(o.get(i)); }
-    else if (o instanceof PDFStream) stack.push(o.dict);
-  }
-  for (const [ref] of ctx.enumerateIndirectObjects()) if (!seen.has(ref.tag)) ctx.delete(ref);
 }
 function redStats() { const live = new Set(S.pages.map(p => p.uid)); const rs = S.objects.filter(o => o.type === 'redact' && live.has(o.page)); return { n: rs.length, pages: new Set(rs.map(o => o.page)).size }; }
 
